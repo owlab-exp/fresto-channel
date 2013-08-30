@@ -17,7 +17,7 @@ public class TestPublisher {
 
 		ZMQ.Context context = ZMQ.context(1);
 		ZMQ.Socket publisher = context.socket(ZMQ.PUB);
-		publisher.connect("tcp://localhost:7000");
+		publisher.connect("tcp://fresto1.owlab.com:7000");
 
 		while(true) {
 			UIEvent event = new UIEvent("test", "test", "test", "test", 12345);
