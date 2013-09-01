@@ -17,7 +17,7 @@ public class TestSubscriber {
 
 		ZMQ.Context context = ZMQ.context(1);
 		ZMQ.Socket subscriber = context.socket(ZMQ.SUB);
-		subscriber.connect("tcp://localhost:7001");
+		subscriber.connect("tcp://fresto1.owlab.com:7001");
 		subscriber.subscribe("A".getBytes());
 		subscriber.subscribe("U".getBytes());
 
