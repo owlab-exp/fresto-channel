@@ -21,6 +21,8 @@ public class TestPublisher {
 
 		while(true) {
 			UIEvent event = new UIEvent("test", "test", "test", "test", 12345);
+			event.setCurrentPlace("testPlace");
+			event.setElapsedTime(10);
 			//event.setUrl("testurl");
 			try {
 				System.out.println("Sending...");

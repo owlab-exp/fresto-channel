@@ -31,10 +31,11 @@ public class TestSubscriber {
 				System.out.println("Message Envelope: " + envelope);
 			       System.out.println("Event.stage : " + event.getStage());
 			       System.out.println("Event.clientId : " + event.getClientId());
-			       System.out.println("Event.currentPage : " + event.getCurrentPage());
+			       System.out.println("Event.currentPlace : " + event.getCurrentPlace());
 			       System.out.println("Event.uuid : " + event.getUuid());
 			       System.out.println("Event.url : " + event.getUrl());
 			       System.out.println("Event.timestamp : " + event.getTimestamp());
+			       System.out.println("Event.elapsedTime : " + event.getElapsedTime());
 			} catch(TException te) {
 				te.printStackTrace();
 			}

@@ -37,10 +37,11 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
 
   private static final org.apache.thrift.protocol.TField STAGE_FIELD_DESC = new org.apache.thrift.protocol.TField("stage", org.apache.thrift.protocol.TType.STRING, (short)1);
   private static final org.apache.thrift.protocol.TField CLIENT_ID_FIELD_DESC = new org.apache.thrift.protocol.TField("clientId", org.apache.thrift.protocol.TType.STRING, (short)3);
-  private static final org.apache.thrift.protocol.TField CURRENT_PAGE_FIELD_DESC = new org.apache.thrift.protocol.TField("currentPage", org.apache.thrift.protocol.TType.STRING, (short)4);
+  private static final org.apache.thrift.protocol.TField CURRENT_PLACE_FIELD_DESC = new org.apache.thrift.protocol.TField("currentPlace", org.apache.thrift.protocol.TType.STRING, (short)4);
   private static final org.apache.thrift.protocol.TField UUID_FIELD_DESC = new org.apache.thrift.protocol.TField("uuid", org.apache.thrift.protocol.TType.STRING, (short)5);
   private static final org.apache.thrift.protocol.TField URL_FIELD_DESC = new org.apache.thrift.protocol.TField("url", org.apache.thrift.protocol.TType.STRING, (short)7);
   private static final org.apache.thrift.protocol.TField TIMESTAMP_FIELD_DESC = new org.apache.thrift.protocol.TField("timestamp", org.apache.thrift.protocol.TType.I64, (short)9);
+  private static final org.apache.thrift.protocol.TField ELAPSED_TIME_FIELD_DESC = new org.apache.thrift.protocol.TField("elapsedTime", org.apache.thrift.protocol.TType.I64, (short)11);
 
   private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
   static {
@@ -50,19 +51,21 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
 
   public String stage; // required
   public String clientId; // required
-  public String currentPage; // optional
+  public String currentPlace; // optional
   public String uuid; // required
   public String url; // required
   public long timestamp; // required
+  public long elapsedTime; // optional
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
     STAGE((short)1, "stage"),
     CLIENT_ID((short)3, "clientId"),
-    CURRENT_PAGE((short)4, "currentPage"),
+    CURRENT_PLACE((short)4, "currentPlace"),
     UUID((short)5, "uuid"),
     URL((short)7, "url"),
-    TIMESTAMP((short)9, "timestamp");
+    TIMESTAMP((short)9, "timestamp"),
+    ELAPSED_TIME((short)11, "elapsedTime");
 
     private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
 
@@ -81,14 +84,16 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
           return STAGE;
         case 3: // CLIENT_ID
           return CLIENT_ID;
-        case 4: // CURRENT_PAGE
-          return CURRENT_PAGE;
+        case 4: // CURRENT_PLACE
+          return CURRENT_PLACE;
         case 5: // UUID
           return UUID;
         case 7: // URL
           return URL;
         case 9: // TIMESTAMP
           return TIMESTAMP;
+        case 11: // ELAPSED_TIME
+          return ELAPSED_TIME;
         default:
           return null;
       }
@@ -130,8 +135,9 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
 
   // isset id assignments
   private static final int __TIMESTAMP_ISSET_ID = 0;
+  private static final int __ELAPSEDTIME_ISSET_ID = 1;
   private byte __isset_bitfield = 0;
-  private _Fields optionals[] = {_Fields.CURRENT_PAGE};
+  private _Fields optionals[] = {_Fields.CURRENT_PLACE,_Fields.ELAPSED_TIME};
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
     Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
@@ -139,13 +145,15 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
     tmpMap.put(_Fields.CLIENT_ID, new org.apache.thrift.meta_data.FieldMetaData("clientId", org.apache.thrift.TFieldRequirementType.REQUIRED, 
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
-    tmpMap.put(_Fields.CURRENT_PAGE, new org.apache.thrift.meta_data.FieldMetaData("currentPage", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+    tmpMap.put(_Fields.CURRENT_PLACE, new org.apache.thrift.meta_data.FieldMetaData("currentPlace", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
     tmpMap.put(_Fields.UUID, new org.apache.thrift.meta_data.FieldMetaData("uuid", org.apache.thrift.TFieldRequirementType.REQUIRED, 
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
     tmpMap.put(_Fields.URL, new org.apache.thrift.meta_data.FieldMetaData("url", org.apache.thrift.TFieldRequirementType.REQUIRED, 
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
     tmpMap.put(_Fields.TIMESTAMP, new org.apache.thrift.meta_data.FieldMetaData("timestamp", org.apache.thrift.TFieldRequirementType.REQUIRED, 
+        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)));
+    tmpMap.put(_Fields.ELAPSED_TIME, new org.apache.thrift.meta_data.FieldMetaData("elapsedTime", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)));
     metaDataMap = Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(UIEvent.class, metaDataMap);
@@ -181,8 +189,8 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
     if (other.isSetClientId()) {
       this.clientId = other.clientId;
     }
-    if (other.isSetCurrentPage()) {
-      this.currentPage = other.currentPage;
+    if (other.isSetCurrentPlace()) {
+      this.currentPlace = other.currentPlace;
     }
     if (other.isSetUuid()) {
       this.uuid = other.uuid;
@@ -191,6 +199,7 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
       this.url = other.url;
     }
     this.timestamp = other.timestamp;
+    this.elapsedTime = other.elapsedTime;
   }
 
   public UIEvent deepCopy() {
@@ -201,11 +210,13 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
   public void clear() {
     this.stage = null;
     this.clientId = null;
-    this.currentPage = null;
+    this.currentPlace = null;
     this.uuid = null;
     this.url = null;
     setTimestampIsSet(false);
     this.timestamp = 0;
+    setElapsedTimeIsSet(false);
+    this.elapsedTime = 0;
   }
 
   public String getStage() {
@@ -256,27 +267,27 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
     }
   }
 
-  public String getCurrentPage() {
-    return this.currentPage;
+  public String getCurrentPlace() {
+    return this.currentPlace;
   }
 
-  public UIEvent setCurrentPage(String currentPage) {
-    this.currentPage = currentPage;
+  public UIEvent setCurrentPlace(String currentPlace) {
+    this.currentPlace = currentPlace;
     return this;
   }
 
-  public void unsetCurrentPage() {
-    this.currentPage = null;
+  public void unsetCurrentPlace() {
+    this.currentPlace = null;
   }
 
-  /** Returns true if field currentPage is set (has been assigned a value) and false otherwise */
-  public boolean isSetCurrentPage() {
-    return this.currentPage != null;
+  /** Returns true if field currentPlace is set (has been assigned a value) and false otherwise */
+  public boolean isSetCurrentPlace() {
+    return this.currentPlace != null;
   }
 
-  public void setCurrentPageIsSet(boolean value) {
+  public void setCurrentPlaceIsSet(boolean value) {
     if (!value) {
-      this.currentPage = null;
+      this.currentPlace = null;
     }
   }
 
@@ -351,6 +362,29 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
     __isset_bitfield = EncodingUtils.setBit(__isset_bitfield, __TIMESTAMP_ISSET_ID, value);
   }
 
+  public long getElapsedTime() {
+    return this.elapsedTime;
+  }
+
+  public UIEvent setElapsedTime(long elapsedTime) {
+    this.elapsedTime = elapsedTime;
+    setElapsedTimeIsSet(true);
+    return this;
+  }
+
+  public void unsetElapsedTime() {
+    __isset_bitfield = EncodingUtils.clearBit(__isset_bitfield, __ELAPSEDTIME_ISSET_ID);
+  }
+
+  /** Returns true if field elapsedTime is set (has been assigned a value) and false otherwise */
+  public boolean isSetElapsedTime() {
+    return EncodingUtils.testBit(__isset_bitfield, __ELAPSEDTIME_ISSET_ID);
+  }
+
+  public void setElapsedTimeIsSet(boolean value) {
+    __isset_bitfield = EncodingUtils.setBit(__isset_bitfield, __ELAPSEDTIME_ISSET_ID, value);
+  }
+
   public void setFieldValue(_Fields field, Object value) {
     switch (field) {
     case STAGE:
@@ -369,11 +403,11 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
       }
       break;
 
-    case CURRENT_PAGE:
+    case CURRENT_PLACE:
       if (value == null) {
-        unsetCurrentPage();
+        unsetCurrentPlace();
       } else {
-        setCurrentPage((String)value);
+        setCurrentPlace((String)value);
       }
       break;
 
@@ -401,6 +435,14 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
       }
       break;
 
+    case ELAPSED_TIME:
+      if (value == null) {
+        unsetElapsedTime();
+      } else {
+        setElapsedTime((Long)value);
+      }
+      break;
+
     }
   }
 
@@ -412,8 +454,8 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
     case CLIENT_ID:
       return getClientId();
 
-    case CURRENT_PAGE:
-      return getCurrentPage();
+    case CURRENT_PLACE:
+      return getCurrentPlace();
 
     case UUID:
       return getUuid();
@@ -423,6 +465,9 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
 
     case TIMESTAMP:
       return Long.valueOf(getTimestamp());
+
+    case ELAPSED_TIME:
+      return Long.valueOf(getElapsedTime());
 
     }
     throw new IllegalStateException();
@@ -439,14 +484,16 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
       return isSetStage();
     case CLIENT_ID:
       return isSetClientId();
-    case CURRENT_PAGE:
-      return isSetCurrentPage();
+    case CURRENT_PLACE:
+      return isSetCurrentPlace();
     case UUID:
       return isSetUuid();
     case URL:
       return isSetUrl();
     case TIMESTAMP:
       return isSetTimestamp();
+    case ELAPSED_TIME:
+      return isSetElapsedTime();
     }
     throw new IllegalStateException();
   }
@@ -482,12 +529,12 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
         return false;
     }
 
-    boolean this_present_currentPage = true && this.isSetCurrentPage();
-    boolean that_present_currentPage = true && that.isSetCurrentPage();
-    if (this_present_currentPage || that_present_currentPage) {
-      if (!(this_present_currentPage && that_present_currentPage))
+    boolean this_present_currentPlace = true && this.isSetCurrentPlace();
+    boolean that_present_currentPlace = true && that.isSetCurrentPlace();
+    if (this_present_currentPlace || that_present_currentPlace) {
+      if (!(this_present_currentPlace && that_present_currentPlace))
         return false;
-      if (!this.currentPage.equals(that.currentPage))
+      if (!this.currentPlace.equals(that.currentPlace))
         return false;
     }
 
@@ -515,6 +562,15 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
       if (!(this_present_timestamp && that_present_timestamp))
         return false;
       if (this.timestamp != that.timestamp)
+        return false;
+    }
+
+    boolean this_present_elapsedTime = true && this.isSetElapsedTime();
+    boolean that_present_elapsedTime = true && that.isSetElapsedTime();
+    if (this_present_elapsedTime || that_present_elapsedTime) {
+      if (!(this_present_elapsedTime && that_present_elapsedTime))
+        return false;
+      if (this.elapsedTime != that.elapsedTime)
         return false;
     }
 
@@ -554,12 +610,12 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
         return lastComparison;
       }
     }
-    lastComparison = Boolean.valueOf(isSetCurrentPage()).compareTo(other.isSetCurrentPage());
+    lastComparison = Boolean.valueOf(isSetCurrentPlace()).compareTo(other.isSetCurrentPlace());
     if (lastComparison != 0) {
       return lastComparison;
     }
-    if (isSetCurrentPage()) {
-      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.currentPage, other.currentPage);
+    if (isSetCurrentPlace()) {
+      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.currentPlace, other.currentPlace);
       if (lastComparison != 0) {
         return lastComparison;
       }
@@ -590,6 +646,16 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
     }
     if (isSetTimestamp()) {
       lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.timestamp, other.timestamp);
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+    }
+    lastComparison = Boolean.valueOf(isSetElapsedTime()).compareTo(other.isSetElapsedTime());
+    if (lastComparison != 0) {
+      return lastComparison;
+    }
+    if (isSetElapsedTime()) {
+      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.elapsedTime, other.elapsedTime);
       if (lastComparison != 0) {
         return lastComparison;
       }
@@ -629,13 +695,13 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
       sb.append(this.clientId);
     }
     first = false;
-    if (isSetCurrentPage()) {
+    if (isSetCurrentPlace()) {
       if (!first) sb.append(", ");
-      sb.append("currentPage:");
-      if (this.currentPage == null) {
+      sb.append("currentPlace:");
+      if (this.currentPlace == null) {
         sb.append("null");
       } else {
-        sb.append(this.currentPage);
+        sb.append(this.currentPlace);
       }
       first = false;
     }
@@ -659,6 +725,12 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
     sb.append("timestamp:");
     sb.append(this.timestamp);
     first = false;
+    if (isSetElapsedTime()) {
+      if (!first) sb.append(", ");
+      sb.append("elapsedTime:");
+      sb.append(this.elapsedTime);
+      first = false;
+    }
     sb.append(")");
     return sb.toString();
   }
@@ -733,10 +805,10 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
-          case 4: // CURRENT_PAGE
+          case 4: // CURRENT_PLACE
             if (schemeField.type == org.apache.thrift.protocol.TType.STRING) {
-              struct.currentPage = iprot.readString();
-              struct.setCurrentPageIsSet(true);
+              struct.currentPlace = iprot.readString();
+              struct.setCurrentPlaceIsSet(true);
             } else { 
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
@@ -761,6 +833,14 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
             if (schemeField.type == org.apache.thrift.protocol.TType.I64) {
               struct.timestamp = iprot.readI64();
               struct.setTimestampIsSet(true);
+            } else { 
+              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+            }
+            break;
+          case 11: // ELAPSED_TIME
+            if (schemeField.type == org.apache.thrift.protocol.TType.I64) {
+              struct.elapsedTime = iprot.readI64();
+              struct.setElapsedTimeIsSet(true);
             } else { 
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
@@ -793,10 +873,10 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
         oprot.writeString(struct.clientId);
         oprot.writeFieldEnd();
       }
-      if (struct.currentPage != null) {
-        if (struct.isSetCurrentPage()) {
-          oprot.writeFieldBegin(CURRENT_PAGE_FIELD_DESC);
-          oprot.writeString(struct.currentPage);
+      if (struct.currentPlace != null) {
+        if (struct.isSetCurrentPlace()) {
+          oprot.writeFieldBegin(CURRENT_PLACE_FIELD_DESC);
+          oprot.writeString(struct.currentPlace);
           oprot.writeFieldEnd();
         }
       }
@@ -813,6 +893,11 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
       oprot.writeFieldBegin(TIMESTAMP_FIELD_DESC);
       oprot.writeI64(struct.timestamp);
       oprot.writeFieldEnd();
+      if (struct.isSetElapsedTime()) {
+        oprot.writeFieldBegin(ELAPSED_TIME_FIELD_DESC);
+        oprot.writeI64(struct.elapsedTime);
+        oprot.writeFieldEnd();
+      }
       oprot.writeFieldStop();
       oprot.writeStructEnd();
     }
@@ -836,12 +921,18 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
       oprot.writeString(struct.url);
       oprot.writeI64(struct.timestamp);
       BitSet optionals = new BitSet();
-      if (struct.isSetCurrentPage()) {
+      if (struct.isSetCurrentPlace()) {
         optionals.set(0);
       }
-      oprot.writeBitSet(optionals, 1);
-      if (struct.isSetCurrentPage()) {
-        oprot.writeString(struct.currentPage);
+      if (struct.isSetElapsedTime()) {
+        optionals.set(1);
+      }
+      oprot.writeBitSet(optionals, 2);
+      if (struct.isSetCurrentPlace()) {
+        oprot.writeString(struct.currentPlace);
+      }
+      if (struct.isSetElapsedTime()) {
+        oprot.writeI64(struct.elapsedTime);
       }
     }
 
@@ -858,10 +949,14 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
       struct.setUrlIsSet(true);
       struct.timestamp = iprot.readI64();
       struct.setTimestampIsSet(true);
-      BitSet incoming = iprot.readBitSet(1);
+      BitSet incoming = iprot.readBitSet(2);
       if (incoming.get(0)) {
-        struct.currentPage = iprot.readString();
-        struct.setCurrentPageIsSet(true);
+        struct.currentPlace = iprot.readString();
+        struct.setCurrentPlaceIsSet(true);
+      }
+      if (incoming.get(1)) {
+        struct.elapsedTime = iprot.readI64();
+        struct.setElapsedTimeIsSet(true);
       }
     }
   }
