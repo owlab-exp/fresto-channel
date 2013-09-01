@@ -40,6 +40,7 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
   private static final org.apache.thrift.protocol.TField CURRENT_PLACE_FIELD_DESC = new org.apache.thrift.protocol.TField("currentPlace", org.apache.thrift.protocol.TType.STRING, (short)4);
   private static final org.apache.thrift.protocol.TField UUID_FIELD_DESC = new org.apache.thrift.protocol.TField("uuid", org.apache.thrift.protocol.TType.STRING, (short)5);
   private static final org.apache.thrift.protocol.TField URL_FIELD_DESC = new org.apache.thrift.protocol.TField("url", org.apache.thrift.protocol.TType.STRING, (short)7);
+  private static final org.apache.thrift.protocol.TField HTTP_STATUS_FIELD_DESC = new org.apache.thrift.protocol.TField("httpStatus", org.apache.thrift.protocol.TType.STRING, (short)8);
   private static final org.apache.thrift.protocol.TField TIMESTAMP_FIELD_DESC = new org.apache.thrift.protocol.TField("timestamp", org.apache.thrift.protocol.TType.I64, (short)9);
   private static final org.apache.thrift.protocol.TField ELAPSED_TIME_FIELD_DESC = new org.apache.thrift.protocol.TField("elapsedTime", org.apache.thrift.protocol.TType.I64, (short)11);
 
@@ -54,6 +55,7 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
   public String currentPlace; // optional
   public String uuid; // required
   public String url; // required
+  public String httpStatus; // optional
   public long timestamp; // required
   public long elapsedTime; // optional
 
@@ -64,6 +66,7 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
     CURRENT_PLACE((short)4, "currentPlace"),
     UUID((short)5, "uuid"),
     URL((short)7, "url"),
+    HTTP_STATUS((short)8, "httpStatus"),
     TIMESTAMP((short)9, "timestamp"),
     ELAPSED_TIME((short)11, "elapsedTime");
 
@@ -90,6 +93,8 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
           return UUID;
         case 7: // URL
           return URL;
+        case 8: // HTTP_STATUS
+          return HTTP_STATUS;
         case 9: // TIMESTAMP
           return TIMESTAMP;
         case 11: // ELAPSED_TIME
@@ -137,7 +142,7 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
   private static final int __TIMESTAMP_ISSET_ID = 0;
   private static final int __ELAPSEDTIME_ISSET_ID = 1;
   private byte __isset_bitfield = 0;
-  private _Fields optionals[] = {_Fields.CURRENT_PLACE,_Fields.ELAPSED_TIME};
+  private _Fields optionals[] = {_Fields.CURRENT_PLACE,_Fields.HTTP_STATUS,_Fields.ELAPSED_TIME};
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
     Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
@@ -150,6 +155,8 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
     tmpMap.put(_Fields.UUID, new org.apache.thrift.meta_data.FieldMetaData("uuid", org.apache.thrift.TFieldRequirementType.REQUIRED, 
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
     tmpMap.put(_Fields.URL, new org.apache.thrift.meta_data.FieldMetaData("url", org.apache.thrift.TFieldRequirementType.REQUIRED, 
+        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
+    tmpMap.put(_Fields.HTTP_STATUS, new org.apache.thrift.meta_data.FieldMetaData("httpStatus", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
     tmpMap.put(_Fields.TIMESTAMP, new org.apache.thrift.meta_data.FieldMetaData("timestamp", org.apache.thrift.TFieldRequirementType.REQUIRED, 
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)));
@@ -198,6 +205,9 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
     if (other.isSetUrl()) {
       this.url = other.url;
     }
+    if (other.isSetHttpStatus()) {
+      this.httpStatus = other.httpStatus;
+    }
     this.timestamp = other.timestamp;
     this.elapsedTime = other.elapsedTime;
   }
@@ -213,6 +223,7 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
     this.currentPlace = null;
     this.uuid = null;
     this.url = null;
+    this.httpStatus = null;
     setTimestampIsSet(false);
     this.timestamp = 0;
     setElapsedTimeIsSet(false);
@@ -339,6 +350,30 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
     }
   }
 
+  public String getHttpStatus() {
+    return this.httpStatus;
+  }
+
+  public UIEvent setHttpStatus(String httpStatus) {
+    this.httpStatus = httpStatus;
+    return this;
+  }
+
+  public void unsetHttpStatus() {
+    this.httpStatus = null;
+  }
+
+  /** Returns true if field httpStatus is set (has been assigned a value) and false otherwise */
+  public boolean isSetHttpStatus() {
+    return this.httpStatus != null;
+  }
+
+  public void setHttpStatusIsSet(boolean value) {
+    if (!value) {
+      this.httpStatus = null;
+    }
+  }
+
   public long getTimestamp() {
     return this.timestamp;
   }
@@ -427,6 +462,14 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
       }
       break;
 
+    case HTTP_STATUS:
+      if (value == null) {
+        unsetHttpStatus();
+      } else {
+        setHttpStatus((String)value);
+      }
+      break;
+
     case TIMESTAMP:
       if (value == null) {
         unsetTimestamp();
@@ -463,6 +506,9 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
     case URL:
       return getUrl();
 
+    case HTTP_STATUS:
+      return getHttpStatus();
+
     case TIMESTAMP:
       return Long.valueOf(getTimestamp());
 
@@ -490,6 +536,8 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
       return isSetUuid();
     case URL:
       return isSetUrl();
+    case HTTP_STATUS:
+      return isSetHttpStatus();
     case TIMESTAMP:
       return isSetTimestamp();
     case ELAPSED_TIME:
@@ -553,6 +601,15 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
       if (!(this_present_url && that_present_url))
         return false;
       if (!this.url.equals(that.url))
+        return false;
+    }
+
+    boolean this_present_httpStatus = true && this.isSetHttpStatus();
+    boolean that_present_httpStatus = true && that.isSetHttpStatus();
+    if (this_present_httpStatus || that_present_httpStatus) {
+      if (!(this_present_httpStatus && that_present_httpStatus))
+        return false;
+      if (!this.httpStatus.equals(that.httpStatus))
         return false;
     }
 
@@ -640,6 +697,16 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
         return lastComparison;
       }
     }
+    lastComparison = Boolean.valueOf(isSetHttpStatus()).compareTo(other.isSetHttpStatus());
+    if (lastComparison != 0) {
+      return lastComparison;
+    }
+    if (isSetHttpStatus()) {
+      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.httpStatus, other.httpStatus);
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+    }
     lastComparison = Boolean.valueOf(isSetTimestamp()).compareTo(other.isSetTimestamp());
     if (lastComparison != 0) {
       return lastComparison;
@@ -721,6 +788,16 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
       sb.append(this.url);
     }
     first = false;
+    if (isSetHttpStatus()) {
+      if (!first) sb.append(", ");
+      sb.append("httpStatus:");
+      if (this.httpStatus == null) {
+        sb.append("null");
+      } else {
+        sb.append(this.httpStatus);
+      }
+      first = false;
+    }
     if (!first) sb.append(", ");
     sb.append("timestamp:");
     sb.append(this.timestamp);
@@ -829,6 +906,14 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
+          case 8: // HTTP_STATUS
+            if (schemeField.type == org.apache.thrift.protocol.TType.STRING) {
+              struct.httpStatus = iprot.readString();
+              struct.setHttpStatusIsSet(true);
+            } else { 
+              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+            }
+            break;
           case 9: // TIMESTAMP
             if (schemeField.type == org.apache.thrift.protocol.TType.I64) {
               struct.timestamp = iprot.readI64();
@@ -890,6 +975,13 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
         oprot.writeString(struct.url);
         oprot.writeFieldEnd();
       }
+      if (struct.httpStatus != null) {
+        if (struct.isSetHttpStatus()) {
+          oprot.writeFieldBegin(HTTP_STATUS_FIELD_DESC);
+          oprot.writeString(struct.httpStatus);
+          oprot.writeFieldEnd();
+        }
+      }
       oprot.writeFieldBegin(TIMESTAMP_FIELD_DESC);
       oprot.writeI64(struct.timestamp);
       oprot.writeFieldEnd();
@@ -924,12 +1016,18 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
       if (struct.isSetCurrentPlace()) {
         optionals.set(0);
       }
-      if (struct.isSetElapsedTime()) {
+      if (struct.isSetHttpStatus()) {
         optionals.set(1);
       }
-      oprot.writeBitSet(optionals, 2);
+      if (struct.isSetElapsedTime()) {
+        optionals.set(2);
+      }
+      oprot.writeBitSet(optionals, 3);
       if (struct.isSetCurrentPlace()) {
         oprot.writeString(struct.currentPlace);
+      }
+      if (struct.isSetHttpStatus()) {
+        oprot.writeString(struct.httpStatus);
       }
       if (struct.isSetElapsedTime()) {
         oprot.writeI64(struct.elapsedTime);
@@ -949,12 +1047,16 @@ public class UIEvent implements org.apache.thrift.TBase<UIEvent, UIEvent._Fields
       struct.setUrlIsSet(true);
       struct.timestamp = iprot.readI64();
       struct.setTimestampIsSet(true);
-      BitSet incoming = iprot.readBitSet(2);
+      BitSet incoming = iprot.readBitSet(3);
       if (incoming.get(0)) {
         struct.currentPlace = iprot.readString();
         struct.setCurrentPlaceIsSet(true);
       }
       if (incoming.get(1)) {
+        struct.httpStatus = iprot.readString();
+        struct.setHttpStatusIsSet(true);
+      }
+      if (incoming.get(2)) {
         struct.elapsedTime = iprot.readI64();
         struct.setElapsedTimeIsSet(true);
       }
