@@ -2,9 +2,9 @@ import org.zeromq.ZMQ;
 import org.zeromq.ZMQ.Context;
 import org.zeromq.ZMQ.Socket;
 
-public  class Forwarder extends  Thread implements Runnable {
-	private static int frontPort = 7000;
-	private static int backPort = 7001;
+public  class APEventHub extends  Thread implements Runnable {
+	private static int frontPort = 7002;
+	private static int backPort = 7003;
 	private ZMQ.Context ctx;
 	private ZMQ.Socket front;
 	private ZMQ.Socket back;
