@@ -27,7 +27,7 @@ public class TestHttpPublisher {
 			try {
 				System.out.println("Sending...");
 				byte[] messageBytes = serializer.serialize(event);
-				publisher.send("A".getBytes(), ZMQ.SNDMORE);
+				publisher.send("H".getBytes(), ZMQ.SNDMORE);
 				publisher.send(messageBytes, 0);
 				System.out.println("Sent");
 			} catch(TException te) {
