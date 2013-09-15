@@ -24,10 +24,11 @@ public class TestHttpSubscriber {
 			System.out.println("Waiting...");
 			String envelope = new String(subscriber.recv(0));
 			byte[] messageBytes = subscriber.recv(0);
+			System.out.println("Received...");
 			try {
-				HttpRequestEvent event = new HttpRequestEvent();
-				deserializer.deserialize(event, messageBytes);
-				System.out.println("Message Envelope: " + envelope);
+			       HttpRequestEvent event = new HttpRequestEvent();
+			       deserializer.deserialize(event, messageBytes);
+			       System.out.println("Message Envelope: " + envelope);
 			       System.out.println("Event.httpMethod : " + event.getHttpMethod());
 			       System.out.println("Event.localHost : " + event.getLocalHost());
 			       System.out.println("Event.localPort : " + event.getLocalPort());
