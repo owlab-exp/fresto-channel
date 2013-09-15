@@ -6,6 +6,7 @@
 <property name="docs.home"     value="${basedir}/docs"/>
 <property name="lib.home"     value="${basedir}/lib"/>
 <property name="src.home"      value="${basedir}/src"/>
+<property name="src-fresto-events.home"      value="${basedir}/fresto-events/gen-java"/>
 <property name="test.home"      value="${basedir}/test"/>
 
 <target name="help">
@@ -40,10 +41,15 @@
 <target name="compile" depends="prepare" description="Compile Java sources">
 	<javac srcdir="${src.home}/java" destdir="${build.home}/classes">
 		<classpath refid="compile.classpath"/>
+		<src path="${src-fresto-events.home}"/>
+		<src path="${src.home}/java"/>
+		<src path="${test.home}/java"/>
 	</javac>
+	<!--
 	<javac srcdir="${test.home}/java" destdir="${build.home}/classes">
 		<classpath refid="compile.classpath"/>
 	</javac>
+	-->
 </target>
 
 <target name="dist" depends="compile" description="Create a jar file for binary distribution">
