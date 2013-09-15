@@ -6,8 +6,6 @@ public  class APEventHub extends  Thread implements Runnable {
 	private static int frontPort = 7002;
 	private static int backPort = 7003;
 	private ZMQ.Context ctx;
-	private ZMQ.Socket front;
-	private ZMQ.Socket back;
 
 	public  static void main(String[] args) {
 		ZMQ.Context context = ZMQ.context(1);
