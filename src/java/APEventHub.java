@@ -20,7 +20,7 @@ public  class APEventHub extends  Thread implements Runnable {
 		ZMQ.Socket backEnd = context.socket(ZMQ.PUB);
 		backEnd.bind("tcp://*:" + backPort);
 
-		System.out.println("Starting Forwarder with " + frontPort + "/" + backPort);
+		System.out.println("Starting Event Hub with " + frontPort + "/" + backPort);
 
 		frontEnd.subscribe("".getBytes());
 		
