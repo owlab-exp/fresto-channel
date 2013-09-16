@@ -19,7 +19,8 @@ public class TestHttpPublisher {
 		ZMQ.Socket publisher = context.socket(ZMQ.PUB);
 		publisher.connect("tcp://fresto1.owlab.com:7002");
 
-		while(true) {
+		//while(true) {
+		for(int i = 0; i < 300; i++) {
 			UIEvent event = new UIEvent("test", "test", "test", "test", 12345);
 			event.setCurrentPlace("testPlace");
 			event.setElapsedTime(10);
