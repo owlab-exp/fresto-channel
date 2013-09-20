@@ -70,7 +70,7 @@ public class APEventWriter {
 	public void openPail() {
 		try {
 			if(tros == null) {
-				Pail pail = Pail.create(path, pailStructure);
+				Pail<FrestoData> pail = Pail.create(path, pailStructure);
 				tros = pail.openWrite();
 			}
 		} catch(Exception e){
