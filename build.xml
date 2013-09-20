@@ -39,7 +39,15 @@
 </target>
 
 <target name="compile" depends="prepare" description="Compile Java sources">
-	<javac srcdir="${src.home}/java" destdir="${build.home}/classes">
+	<javac includeantruntime="false" 
+		srcdir="${src.home}/java" 
+		destdir="${build.home}/classes"
+		debug="true"
+		debuglevel="lines,source">
+		<!--
+		<compilerarg value="-Xlint:deprecation"/>
+		<compilerarg value="-Xlint:unchecked"/>
+		-->
 		<classpath refid="compile.classpath"/>
 		<src path="${src-fresto-events.home}"/>
 		<src path="${src.home}/java"/>
