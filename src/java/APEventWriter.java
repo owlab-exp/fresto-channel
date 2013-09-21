@@ -27,6 +27,7 @@ import fresto.data.EntryInvokeProperty;
 import fresto.data.EntryReturnID;
 import fresto.data.EntryReturnPropertyValue;
 import fresto.data.EntryReturnProperty;
+import fresto.data.EntryReturnEdge;
 import fresto.data.HostID;
 import fresto.data.ApplicationID;
 import fresto.data.ManagedResourceID;
@@ -226,40 +227,59 @@ public class APEventWriter {
 
 
 
-		}
-		if(TOPIC_ENTRY_RETURN.equals(topic)) {
+		} else if(TOPIC_ENTRY_RETURN.equals(topic)) {
 			HttpResponseEvent event = new HttpResponseEvent();
 			deserializer.deserialize(event, eventBytes);
 			
-			LOGGER.info("Message Topic: " + topic);
-			LOGGER.info("Event.frestoUUID : " + event.frestoUUID);
-			LOGGER.info("Event.typeName : " + event.typeName);
-			LOGGER.info("Event.signatureName : " + event.signatureName);
-			LOGGER.info("Event.depth : " + event.depth);
-			LOGGER.info("Event.timestamp : " + event.timestamp);
-			LOGGER.info("Event.receivedTime : " + event.receivedTime);
+			LOGGER.fine("Event.frestoUUID : " + event.frestoUUID);
+			LOGGER.fine("Event.typeName : " + event.typeName);
+			LOGGER.fine("Event.signatureName : " + event.signatureName);
+			LOGGER.fine("Event.depth : " + event.depth);
+			LOGGER.fine("Event.timestamp : " + event.timestamp);
+			LOGGER.fine("Event.receivedTime : " + event.receivedTime);
 
-			EntryReturnPropertyValue erpv = new EntryReturnPropertyValue();
-			erpv.response_code = 200;
-			erpv.length = -1L;
-			erpv.timestamp = event.timestamp;
+			EntryReturnID entryReturnId = EntryReturnID.uuid(event.frestoUUID);
+			EntryReturnPropertyValue entryReturnPropertyValue = new EntryReturnPropertyValue();
+			entryReturnPropertyValue.response_code = 200;
+			entryReturnPropertyValue.length = -1L;
+			entryReturnPropertyValue.timestamp = event.timestamp;
 
 
-			EntryReturnProperty erp = new EntryReturnProperty();
-			erp.entry_return = EntryReturnID.uuid(event.frestoUUID);
-			erp.property = erpv;
+			EntryReturnProperty entryReturnProperty = new EntryReturnProperty();
+			entryReturnProperty.entry_return = entryReturnId;
+			entryReturnProperty.property = entryReturnPropertyValue;
+
+			OperationID operationId = OperationID.operation_name(event.signatureName);
+			TypeID typeId = TypeID.type_name(event.typeName);
+			OperationPropertyValue operationPropertyValue = new OperationPropertyValue();
+			operationPropertyValue.type = typeId;
+			
+			OperationProperty operationProperty = new OperationProperty();
+			operationProperty.operation = operationId;
+			operationProperty.property = operationPropertyValue;
+
+			EntryReturnEdge entryReturnEdge = new EntryReturnEdge();
+			entryReturnEdge.entry_return = entryReturnId;
+			entryReturnEdge.operation = operationId;
 
 			Pedigree pedigree = new Pedigree();
 			pedigree.fresto_timestamp = frestoTimestamp;
 
 			FrestoData fd = new FrestoData();
 			fd.pedigree = pedigree;
-			fd.data_unit = DataUnit.application_data_unit(ApplicationDataUnit.entry_return_property(erp));
 
+			fd.data_unit = DataUnit.application_data_unit(ApplicationDataUnit.entry_return_property(entryReturnProperty));
 			tros.writeObject(fd);
+
+			fd.data_unit = DataUnit.application_data_unit(ApplicationDataUnit.operation_property(operationProperty));
+			tros.writeObject(fd);
+
+			fd.data_unit = DataUnit.application_data_unit(ApplicationDataUnit.entry_return_edge(entryReturnEdge));
+			tros.writeObject(fd);
+
+		} else {
+			LOGGER.info("Topic not processed: " + topic);
 		}
-			
-			
 	}
 }
 

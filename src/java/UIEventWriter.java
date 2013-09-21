@@ -54,9 +54,10 @@ import fresto.format.UIEvent;
 import fresto.command.CommandEvent;
 
 public class UIEventWriter {
-	private static String thisClassName = "UIEventWriter";
-	private static final String path = "hdfs://fresto1.owlab.com:9000/fresto/new";
-	private static Logger LOGGER = Logger.getLogger(thisClassName);
+	private static String THIS_CLASS_NAME = "UIEventWriter";
+	private static final String HDFS_URL = "hdfs://fresto1.owlab.com:9000/fresto/new";
+	private static Logger LOGGER = Logger.getLogger(THIS_CLASS_NAME);
+	private static final String ZMQ_URL = "tcp://fresto1.owlab.com:7004";
 	private static final String TOPIC_REQUEST = "U";
 	private static final String TOPIC_COMMAND_EVENT = "CMD";
 	private static TDeserializer deserializer = new TDeserializer(new TBinaryProtocol.Factory());
@@ -67,11 +68,11 @@ public class UIEventWriter {
 		APEventWriter eventWriter = new APEventWriter();
 
 		ZMQ.Context context = ZMQ.context(1);
-		ZMQ.Socket subscriber = context.socket(ZMQ.SUB);
-		subscriber.connect("tcp://fresto1.owlab.com:7001");
+		ZMQ.Socket subscriber = context.socket(ZMQ.PULL);
+		subscriber.connect(ZMQ_URL);
 		//subscriber.subscribe("A".getBytes());
-		subscriber.subscribe(TOPIC_REQUEST.getBytes());
-		subscriber.subscribe(TOPIC_COMMAND_EVENT.getBytes());
+		//subscriber.subscribe(TOPIC_REQUEST.getBytes());
+		//subscriber.subscribe(TOPIC_COMMAND_EVENT.getBytes());
 
 		while(true) {
 		//for(int i = 0; i < 10; i++){
@@ -85,7 +86,7 @@ public class UIEventWriter {
 				LOGGER.info("A command received.");
 				CommandEvent event = new CommandEvent();
 				deserializer.deserialize(event, eventBytes);
-				if(event.target_module.equalsIgnoreCase(thisClassName)) {
+				if(event.target_module.equalsIgnoreCase(THIS_CLASS_NAME)) {
 					if(event.command.equalsIgnoreCase("exit")) {
 						LOGGER.info("Perform command: " + event.command);
 						break;
@@ -97,9 +98,11 @@ public class UIEventWriter {
 			}
 
 			// Append Pail Data
+			long startTime = System.currentTimeMillis();
 			eventWriter.openPail();
 			eventWriter.appendPailData(topic, eventBytes, System.currentTimeMillis());
 			eventWriter.closePail();
+			LOGGER.info("Time taken: " + (System.currentTimeMillis() - startTime) + " ms");
 		}
 
 		subscriber.close();
@@ -109,7 +112,7 @@ public class UIEventWriter {
 	public void createPail() {
 		try {
 			if(tros == null) {
-				Pail<FrestoData> pail = Pail.create(path, pailStructure);
+				Pail<FrestoData> pail = Pail.create(HDFS_URL, pailStructure);
 				tros = pail.openWrite();
 			}
 		} catch(Exception e){
@@ -120,7 +123,7 @@ public class UIEventWriter {
 	public void openPail() {
 		try {
 			if(tros == null) {
-				Pail<FrestoData> pail = new Pail<FrestoData>(path);
+				Pail<FrestoData> pail = new Pail<FrestoData>(HDFS_URL);
 				tros = pail.openWrite();
 			}
 		} catch(IOException e){
@@ -288,9 +291,9 @@ public class UIEventWriter {
 
 				fd.data_unit = DataUnit.client_data_unit(ClientDataUnit.response_client_edge(responseClientEdge));
 				tros.writeObject(fd);
-			} else {
-				LOGGER.warning("Event topic: " + topic + " not recognized");
-			}
+			} 
+		} else {
+				LOGGER.warning("Event topic: " + topic + " not recognized"); 
 		}
 	}
 }
