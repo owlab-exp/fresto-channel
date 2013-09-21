@@ -31,44 +31,52 @@ import fresto.data.HostID;
 import fresto.data.ApplicationID;
 import fresto.data.ManagedResourceID;
 import fresto.data.OperationID;
+import fresto.data.TypeID;
+import fresto.data.OperationProperty;
+import fresto.data.OperationPropertyValue;
+import fresto.data.EntryInvokeEdge;
+import fresto.data.ApplicationResourceEdge;
+import fresto.data.HostApplicationEdge;
+import fresto.data.ImplementResourceEdge;
 
 import fresto.command.CommandEvent;
 
 public class APEventWriter {
-
-	private static Logger LOGGER = Logger.getLogger("APEventWriter");
+	private static String THIS_CLASS_NAME = "APEventWriter";
+	private static Logger LOGGER = Logger.getLogger(THIS_CLASS_NAME);
+	private static final String ZMQ_URL = "tcp://fresto1.owlab.com:7005";
 	private static final String TOPIC_ENTRY_INVOKE = "HB";
 	private static final String TOPIC_ENTRY_RETURN = "HE";
 	private static final String TOPIC_COMMAND_EVENT = "CMD";
-	private static TDeserializer deserializer = new TDeserializer(new TBinaryProtocol.Factory());
-	private static final String path = "hdfs://fresto1.owlab.com:9000/fresto/new";
+	private static final String HDFS_PATH = "hdfs://fresto1.owlab.com:9000/fresto/new";
 	private static final SplitFrestoDataPailStructure pailStructure = new SplitFrestoDataPailStructure();
 	private TypedRecordOutputStream tros;
+	private static TDeserializer deserializer = new TDeserializer(new TBinaryProtocol.Factory());
 
 	public static void main(String[] args) throws Exception {
 		APEventWriter eventWriter = new APEventWriter();
 
 		ZMQ.Context context = ZMQ.context(1);
-		ZMQ.Socket subscriber = context.socket(ZMQ.SUB);
-		subscriber.connect("tcp://fresto1.owlab.com:7003");
-		//subscriber.subscribe("A".getBytes());
-		subscriber.subscribe(TOPIC_ENTRY_INVOKE.getBytes());
-		subscriber.subscribe(TOPIC_ENTRY_RETURN.getBytes());
-		subscriber.subscribe(TOPIC_COMMAND_EVENT.getBytes());
+		ZMQ.Socket puller = context.socket(ZMQ.PULL);
+		puller.connect(ZMQ_URL);
+
+		//puller.subscribe(TOPIC_ENTRY_INVOKE.getBytes());
+		//puller.subscribe(TOPIC_ENTRY_RETURN.getBytes());
+		//puller.subscribe(TOPIC_COMMAND_EVENT.getBytes());
 
 		while(true) {
 		//for(int i = 0; i < 10; i++){
 			LOGGER.info("Waiting...");
-			String topic = new String(subscriber.recv(0));
+			String topic = new String(puller.recv(0));
 			
-			byte[] eventBytes = subscriber.recv(0);
+			byte[] eventBytes = puller.recv(0);
 			LOGGER.info(eventBytes.length + " bytes received");
 
 			if(TOPIC_COMMAND_EVENT.equals(topic)) {
 				LOGGER.info("A command received.");
 				CommandEvent event = new CommandEvent();
 				deserializer.deserialize(event, eventBytes);
-				if(event.target_module.equalsIgnoreCase("APEventWriter")) {
+				if(event.target_module.equalsIgnoreCase(THIS_CLASS_NAME)) {
 					if(event.command.equalsIgnoreCase("exit")) {
 						LOGGER.info("Perform command: " + event.command);
 						break;
@@ -80,19 +88,21 @@ public class APEventWriter {
 			}
 
 			// Append Pail Data
+			long startTime = System.currentTimeMillis();
 			eventWriter.openPail();
 			eventWriter.appendPailData(topic, eventBytes, System.currentTimeMillis());
 			eventWriter.closePail();
+			LOGGER.info("Time taken: " + (System.currentTimeMillis() - startTime) + " ms");	
 		}
 
-		subscriber.close();
+		puller.close();
 		context.term();
 	}
 
 	public void createPail() {
 		try {
 			if(tros == null) {
-				Pail<FrestoData> pail = Pail.create(path, pailStructure);
+				Pail<FrestoData> pail = Pail.create(HDFS_PATH, pailStructure);
 				tros = pail.openWrite();
 			}
 		} catch(Exception e){
@@ -103,7 +113,7 @@ public class APEventWriter {
 	public void openPail() {
 		try {
 			if(tros == null) {
-				Pail<FrestoData> pail = new Pail<FrestoData>(path);
+				Pail<FrestoData> pail = new Pail<FrestoData>(HDFS_PATH);
 				tros = pail.openWrite();
 			}
 		} catch(IOException e){
@@ -129,7 +139,7 @@ public class APEventWriter {
 		}
 	}
 
-	public void appendPailData(String topic, byte[] eventBytes, long timestamp) throws TException, IOException {
+	public void appendPailData(String topic, byte[] eventBytes, long frestoTimestamp) throws TException, IOException {
 		if(TOPIC_ENTRY_INVOKE.equals(topic)) {
 			HttpRequestEvent event = new HttpRequestEvent();
 			deserializer.deserialize(event, eventBytes);
@@ -145,27 +155,77 @@ public class APEventWriter {
 			LOGGER.fine("Event.depth : " + event.depth);
 			LOGGER.fine("Event.timestamp : " + event.timestamp);
 
-			EntryInvokePropertyValue eipv = new EntryInvokePropertyValue();
-			eipv.http_method = event.httpMethod;
-			eipv.host = HostID.host_name(event.localHost);
-			eipv.port = event.localPort;
-			eipv.application = ApplicationID.context_path(event.contextPath);
-			eipv.managed_resource = ManagedResourceID.servlet_path(event.servletPath);
-			eipv.operation = OperationID.operation_name(event.signatureName);
-			eipv.timestamp = event.timestamp;
+			HostID hostId = HostID.host_name(event.localHost);
+			ApplicationID applicationId = ApplicationID.context_path(event.contextPath);
+			ManagedResourceID managedResourceId = ManagedResourceID.servlet_path(event.servletPath);
+			TypeID typeId = TypeID.type_name(event.typeName);
 
-			EntryInvokeProperty eip = new EntryInvokeProperty();
-			eip.entry_invoke = EntryInvokeID.uuid(event.frestoUUID);
-			eip.property = eipv;
+			OperationID operationId = OperationID.operation_name(event.signatureName);
+			OperationPropertyValue operationPropertyValue = new OperationPropertyValue();
+			operationPropertyValue.type = typeId;
+
+			OperationProperty operationProperty = new OperationProperty();
+			operationProperty.operation = operationId;
+			operationProperty.property = operationPropertyValue;
+
+			EntryInvokeID entryInvokeId = EntryInvokeID.uuid(event.frestoUUID);
+
+
+			EntryInvokePropertyValue entryInvokePropertyValue = new EntryInvokePropertyValue();
+			entryInvokePropertyValue.http_method = event.httpMethod;
+			entryInvokePropertyValue.host = hostId;
+			entryInvokePropertyValue.port = event.localPort;
+			entryInvokePropertyValue.application = applicationId;
+			entryInvokePropertyValue.managed_resource = managedResourceId;
+			entryInvokePropertyValue.operation = operationId;
+			entryInvokePropertyValue.timestamp = event.timestamp;
+
+			EntryInvokeProperty entryInvokeProperty = new EntryInvokeProperty();
+			entryInvokeProperty.entry_invoke = entryInvokeId;
+			entryInvokeProperty.property = entryInvokePropertyValue;
+
+			EntryInvokeEdge entryInvokeEdge = new EntryInvokeEdge();
+			entryInvokeEdge.entry_invoke = entryInvokeId;
+			entryInvokeEdge.operation = operationId;
+
+			ImplementResourceEdge implementResourceEdge = new ImplementResourceEdge();
+			implementResourceEdge.managed_resource = managedResourceId;
+			implementResourceEdge.operation = operationId;
+
+			ApplicationResourceEdge applicationResourceEdge = new ApplicationResourceEdge();
+			applicationResourceEdge.application = applicationId;
+			applicationResourceEdge.managed_resource = managedResourceId;
+
+			HostApplicationEdge hostApplicationEdge = new HostApplicationEdge();
+			hostApplicationEdge.host = hostId;
+			hostApplicationEdge.application = applicationId;
 
 			Pedigree pedigree = new Pedigree();
-			pedigree.fresto_timestamp = timestamp;
+			pedigree.fresto_timestamp = frestoTimestamp;
 
 			FrestoData fd = new FrestoData();
 			fd.pedigree = pedigree;
-			fd.data_unit = DataUnit.application_data_unit(ApplicationDataUnit.entry_invoke_property(eip));
 
+			fd.data_unit = DataUnit.application_data_unit(ApplicationDataUnit.entry_invoke_property(entryInvokeProperty));
 			tros.writeObject(fd);
+
+			fd.data_unit = DataUnit.application_data_unit(ApplicationDataUnit.entry_invoke_edge(entryInvokeEdge));
+			tros.writeObject(fd);
+
+			fd.data_unit = DataUnit.application_data_unit(ApplicationDataUnit.operation_property(operationProperty));
+			tros.writeObject(fd);
+
+			fd.data_unit = DataUnit.application_data_unit(ApplicationDataUnit.implement_resource_edge(implementResourceEdge));
+			tros.writeObject(fd);
+
+			fd.data_unit = DataUnit.application_data_unit(ApplicationDataUnit.application_resource_edge(applicationResourceEdge));
+			tros.writeObject(fd);
+
+			fd.data_unit = DataUnit.application_data_unit(ApplicationDataUnit.host_application_edge(hostApplicationEdge));
+			tros.writeObject(fd);
+
+
+
 		}
 		if(TOPIC_ENTRY_RETURN.equals(topic)) {
 			HttpResponseEvent event = new HttpResponseEvent();
@@ -190,7 +250,7 @@ public class APEventWriter {
 			erp.property = erpv;
 
 			Pedigree pedigree = new Pedigree();
-			pedigree.fresto_timestamp = timestamp;
+			pedigree.fresto_timestamp = frestoTimestamp;
 
 			FrestoData fd = new FrestoData();
 			fd.pedigree = pedigree;
