@@ -4,6 +4,6 @@ fresto-channel
 This is to develop and maintain messaging channels for fresto components' communication.
 
 Update:
-* TestPublihser to send dummy events to monitoring server's messaging device.
-* TestSubscriber to receive evetns from the monitoring-front.
-By using the TestSubscriber or chaning it, you can receive actual events from the monitoring-front.
+* Two event hubs are created. The hubs receive performance event data and forward to subscribers.
+* Two event streamers are created. The streamers receives from the hubs and send data to pullers.
+* Two event writers are created. The writers pull data from the streamers and write the data (Thrift objects) on Hadoop storage by using Pail.
