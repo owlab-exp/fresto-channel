@@ -32,12 +32,14 @@ import fresto.data.ApplicationID;
 import fresto.data.ManagedResourceID;
 import fresto.data.OperationID;
 
+import fresto.command.CommandEvent;
 
 public class APEventWriter {
 
 	private static Logger LOGGER = Logger.getLogger("APEventWriter");
 	private static final String TOPIC_ENTRY_INVOKE = "HB";
 	private static final String TOPIC_ENTRY_RETURN = "HE";
+	private static final String TOPIC_COMMAND_EVENT = "CMD";
 	private static TDeserializer deserializer = new TDeserializer(new TBinaryProtocol.Factory());
 	private static final String path = "hdfs://fresto1.owlab.com:9000/fresto/new";
 	private static final SplitFrestoDataPailStructure pailStructure = new SplitFrestoDataPailStructure();
@@ -45,7 +47,6 @@ public class APEventWriter {
 
 	public static void main(String[] args) throws Exception {
 		APEventWriter eventWriter = new APEventWriter();
-		eventWriter.openPail();
 
 		ZMQ.Context context = ZMQ.context(1);
 		ZMQ.Socket subscriber = context.socket(ZMQ.SUB);
@@ -53,21 +54,42 @@ public class APEventWriter {
 		//subscriber.subscribe("A".getBytes());
 		subscriber.subscribe(TOPIC_ENTRY_INVOKE.getBytes());
 		subscriber.subscribe(TOPIC_ENTRY_RETURN.getBytes());
+		subscriber.subscribe(TOPIC_COMMAND_EVENT.getBytes());
 
 		while(true) {
+		//for(int i = 0; i < 10; i++){
 			LOGGER.info("Waiting...");
 			String topic = new String(subscriber.recv(0));
+			
 			byte[] eventBytes = subscriber.recv(0);
 			LOGGER.info(eventBytes.length + " bytes received");
 
+			if(TOPIC_COMMAND_EVENT.equals(topic)) {
+				LOGGER.info("A command received.");
+				CommandEvent event = new CommandEvent();
+				deserializer.deserialize(event, eventBytes);
+				if(event.target_module.equalsIgnoreCase("APEventWriter")) {
+					if(event.command.equalsIgnoreCase("exit")) {
+						LOGGER.info("Perform command: " + event.command);
+						break;
+					} else {
+						LOGGER.warning("Unsupported command: " + event.command);
+						LOGGER.warning("Supported: exit");
+					}
+				}
+			}
+
 			// Append Pail Data
+			eventWriter.openPail();
 			eventWriter.appendPailData(topic, eventBytes, System.currentTimeMillis());
+			eventWriter.closePail();
 		}
 
-		//eventWriter.closePail();
+		subscriber.close();
+		context.term();
 	}
 
-	public void openPail() {
+	public void createPail() {
 		try {
 			if(tros == null) {
 				Pail<FrestoData> pail = Pail.create(path, pailStructure);
@@ -75,6 +97,25 @@ public class APEventWriter {
 			}
 		} catch(Exception e){
 			throw new RuntimeException(e);
+		}
+	}
+
+	public void openPail() {
+		try {
+			if(tros == null) {
+				Pail<FrestoData> pail = new Pail<FrestoData>(path);
+				tros = pail.openWrite();
+			}
+		} catch(IOException e){
+			//throw new RuntimeException(e);
+			//e.printStackTrace();
+			LOGGER.info("Pail open failed, trying to create pail.");
+			createPail();
+		} catch(IllegalArgumentException e){
+			//throw new RuntimeException(e);
+			//e.printStackTrace();
+			LOGGER.info("Pail open failed, trying to create pail.");
+			createPail();
 		}
 	}
 

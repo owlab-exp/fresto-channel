@@ -33,7 +33,7 @@
 	<delete dir="${dist.home}"/>
 </target>
 
-<target name="prepare" depends="clean" description="Create working dirs and copy static files to work dir">
+<target name="prepare" depends="" description="Create working dirs and copy static files to work dir">
 	<mkdir  dir="${dist.home}"/>
 	<mkdir  dir="${build.home}/classes"/>
 </target>
