@@ -4,10 +4,10 @@ import org.zeromq.ZMQ.Socket;
 
 import java.util.logging.Logger;
 
-public  class APEventStreamer extends  Thread implements Runnable {
-	private static Logger LOGGER = Logger.getLogger("APEventStreamer");
-	private static int frontPort = 7003;
-	private static int backPort = 7005;
+public  class UIEventStreamer extends  Thread implements Runnable {
+	private static Logger LOGGER = Logger.getLogger("UIEventStreamer");
+	private static int frontPort = 7001;
+	private static int backPort = 7004;
 	private ZMQ.Context ctx;
 
 	public  static void main(String[] args) {
