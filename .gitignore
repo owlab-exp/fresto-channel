@@ -1,6 +1,5 @@
 *.class
-
 *.log
-
+*.bak
 *.jar
 /bin

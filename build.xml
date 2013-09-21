@@ -1,6 +1,6 @@
-<project name="eventhub" default="dist" basedir=".">
+<project name="Event Transmittion" default="dist" basedir=".">
 <!-- Define the properties used by the build -->
-<property name="jar.name"    value="eventhub"/>
+<property name="jar.name"    value="event-trans"/>
 <property name="build.home"    value="${basedir}/build"/>
 <property name="dist.home"     value="${basedir}/dist"/>
 <property name="docs.home"     value="${basedir}/docs"/>
@@ -33,13 +33,21 @@
 	<delete dir="${dist.home}"/>
 </target>
 
-<target name="prepare" depends="clean" description="Create working dirs and copy static files to work dir">
+<target name="prepare" depends="" description="Create working dirs and copy static files to work dir">
 	<mkdir  dir="${dist.home}"/>
 	<mkdir  dir="${build.home}/classes"/>
 </target>
 
 <target name="compile" depends="prepare" description="Compile Java sources">
-	<javac srcdir="${src.home}/java" destdir="${build.home}/classes">
+	<javac includeantruntime="false" 
+		srcdir="${src.home}/java" 
+		destdir="${build.home}/classes"
+		debug="true"
+		debuglevel="lines,source">
+		<!--
+		<compilerarg value="-Xlint:deprecation"/>
+		<compilerarg value="-Xlint:unchecked"/>
+		-->
 		<classpath refid="compile.classpath"/>
 		<src path="${src-fresto-events.home}"/>
 		<src path="${src.home}/java"/>
