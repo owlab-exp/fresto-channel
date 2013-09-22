@@ -65,7 +65,7 @@ public class UIEventWriter {
 	private TypedRecordOutputStream tros;
 
 	public static void main(String[] args) throws Exception {
-		APEventWriter eventWriter = new APEventWriter();
+		UIEventWriter eventWriter = new UIEventWriter();
 
 		ZMQ.Context context = ZMQ.context(1);
 		ZMQ.Socket subscriber = context.socket(ZMQ.PULL);
@@ -78,7 +78,8 @@ public class UIEventWriter {
 		//for(int i = 0; i < 10; i++){
 			LOGGER.info("Waiting...");
 			String topic = new String(subscriber.recv(0));
-			
+			//LOGGER.info("Topic=" + topic + " and matching=" + TOPIC_REQUEST.equals(topic));
+
 			byte[] eventBytes = subscriber.recv(0);
 			LOGGER.info(eventBytes.length + " bytes received");
 
@@ -102,7 +103,7 @@ public class UIEventWriter {
 			eventWriter.openPail();
 			eventWriter.appendPailData(topic, eventBytes, System.currentTimeMillis());
 			eventWriter.closePail();
-			LOGGER.info("Time taken: " + (System.currentTimeMillis() - startTime) + " ms");
+			LOGGER.info("Time taken for writing: " + (System.currentTimeMillis() - startTime) + " ms");
 		}
 
 		subscriber.close();
@@ -151,6 +152,7 @@ public class UIEventWriter {
 
 	public void appendPailData(String topic, byte[] eventBytes, long receive_timestamp) throws TException, IOException {
 		if(TOPIC_REQUEST.equals(topic)) {
+
 			UIEvent event = new UIEvent();
 			deserializer.deserialize(event, eventBytes);
 
