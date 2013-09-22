@@ -65,6 +65,7 @@ public class UIEventWriter {
 	private TypedRecordOutputStream tros;
 
 	public static void main(String[] args) throws Exception {
+
 		UIEventWriter eventWriter = new UIEventWriter();
 
 		ZMQ.Context context = ZMQ.context(1);
@@ -182,7 +183,8 @@ public class UIEventWriter {
 				RequestPropertyValue requestPropertyValue = new RequestPropertyValue();
 				requestPropertyValue.referrer = ReferrerID.url(event.currentPlace);
 				requestPropertyValue.method = "GET";
-				requestPropertyValue.query = event.url.split("\\?")[1];
+				String[] urlQuery = event.url.split("\\?");
+				requestPropertyValue.query = ((urlQuery.length == 2) ? urlQuery[1] : urlQuery[0]);
 				requestPropertyValue.timestamp = event.timestamp;
 				
 				RequestProperty requestProperty = new RequestProperty();
