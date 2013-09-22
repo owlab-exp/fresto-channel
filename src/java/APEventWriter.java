@@ -201,29 +201,40 @@ public class APEventWriter {
 			hostApplicationEdge.host = hostId;
 			hostApplicationEdge.application = applicationId;
 
+			ApplicationDataUnit applicationDataUnit = new ApplicationDataUnit();
+			applicationDataUnit.entry_invoke_property = entryInvokeProperty;
+			applicationDataUnit.entry_invoke_edge = entryInvokeEdge;
+			applicationDataUnit.operation_property = operationProperty;
+			applicationDataUnit.implement_resource_edge = implementResourceEdge;
+			applicationDataUnit.application_resource_edge = applicationResourceEdge;
+			applicationDataUnit.host_application_edge = hostApplicationEdge;
+			
 			Pedigree pedigree = new Pedigree();
 			pedigree.fresto_timestamp = frestoTimestamp;
 
 			FrestoData fd = new FrestoData();
 			fd.pedigree = pedigree;
+			fd.data_unit = DataUnit.application_data_unit(applicationDataUnit);
 
-			fd.data_unit = DataUnit.application_data_unit(ApplicationDataUnit.entry_invoke_property(entryInvokeProperty));
 			tros.writeObject(fd);
 
-			fd.data_unit = DataUnit.application_data_unit(ApplicationDataUnit.entry_invoke_edge(entryInvokeEdge));
-			tros.writeObject(fd);
+			//fd.data_unit = DataUnit.application_data_unit(ApplicationDataUnit.entry_invoke_property(entryInvokeProperty));
+			//tros.writeObject(fd);
 
-			fd.data_unit = DataUnit.application_data_unit(ApplicationDataUnit.operation_property(operationProperty));
-			tros.writeObject(fd);
+			//fd.data_unit = DataUnit.application_data_unit(ApplicationDataUnit.entry_invoke_edge(entryInvokeEdge));
+			//tros.writeObject(fd);
 
-			fd.data_unit = DataUnit.application_data_unit(ApplicationDataUnit.implement_resource_edge(implementResourceEdge));
-			tros.writeObject(fd);
+			//fd.data_unit = DataUnit.application_data_unit(ApplicationDataUnit.operation_property(operationProperty));
+			//tros.writeObject(fd);
 
-			fd.data_unit = DataUnit.application_data_unit(ApplicationDataUnit.application_resource_edge(applicationResourceEdge));
-			tros.writeObject(fd);
+			//fd.data_unit = DataUnit.application_data_unit(ApplicationDataUnit.implement_resource_edge(implementResourceEdge));
+			//tros.writeObject(fd);
 
-			fd.data_unit = DataUnit.application_data_unit(ApplicationDataUnit.host_application_edge(hostApplicationEdge));
-			tros.writeObject(fd);
+			//fd.data_unit = DataUnit.application_data_unit(ApplicationDataUnit.application_resource_edge(applicationResourceEdge));
+			//tros.writeObject(fd);
+
+			//fd.data_unit = DataUnit.application_data_unit(ApplicationDataUnit.host_application_edge(hostApplicationEdge));
+			//tros.writeObject(fd);
 
 
 
@@ -262,20 +273,28 @@ public class APEventWriter {
 			entryReturnEdge.entry_return = entryReturnId;
 			entryReturnEdge.operation = operationId;
 
+			ApplicationDataUnit applicationDataUnit = new ApplicationDataUnit();
+			applicationDataUnit.entry_return_property = entryReturnProperty;
+			applicationDataUnit.operation_property = operationProperty;
+			applicationDataUnit.entry_return_edge = entryReturnEdge;
+			
 			Pedigree pedigree = new Pedigree();
 			pedigree.fresto_timestamp = frestoTimestamp;
 
 			FrestoData fd = new FrestoData();
 			fd.pedigree = pedigree;
+			fd.data_unit = DataUnit.application_data_unit(applicationDataUnit);
 
-			fd.data_unit = DataUnit.application_data_unit(ApplicationDataUnit.entry_return_property(entryReturnProperty));
 			tros.writeObject(fd);
 
-			fd.data_unit = DataUnit.application_data_unit(ApplicationDataUnit.operation_property(operationProperty));
-			tros.writeObject(fd);
+			//fd.data_unit = DataUnit.application_data_unit(ApplicationDataUnit.entry_return_property(entryReturnProperty));
+			//tros.writeObject(fd);
 
-			fd.data_unit = DataUnit.application_data_unit(ApplicationDataUnit.entry_return_edge(entryReturnEdge));
-			tros.writeObject(fd);
+			//fd.data_unit = DataUnit.application_data_unit(ApplicationDataUnit.operation_property(operationProperty));
+			//tros.writeObject(fd);
+
+			//fd.data_unit = DataUnit.application_data_unit(ApplicationDataUnit.entry_return_edge(entryReturnEdge));
+			//tros.writeObject(fd);
 
 		} else {
 			LOGGER.info("Topic not processed: " + topic);

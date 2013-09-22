@@ -210,23 +210,33 @@ public class UIEventWriter {
 				Pedigree pedigree = new Pedigree();
 				pedigree.fresto_timestamp = receive_timestamp;
 
+				// Making Client Data Unit
+				ClientDataUnit clientDataUnit = new ClientDataUnit();
+				clientDataUnit.client_property = clientProperty;
+				clientDataUnit.request_property = requestProperty;
+				clientDataUnit.resource_property = resourceProperty;
+				clientDataUnit.client_request_edge = clientRequestEdge;;
+				clientDataUnit.request_resource_edge = requestResourceEdge;;
 				// Making required Fresto Data objects 
 				FrestoData fd = new FrestoData();
 				fd.pedigree = pedigree;
-				fd.data_unit = DataUnit.client_data_unit(ClientDataUnit.client_property(clientProperty));
-				tros.writeObject(fd);
+				fd.data_unit = DataUnit.client_data_unit(clientDataUnit);
 
-				fd.data_unit = DataUnit.client_data_unit(ClientDataUnit.request_property(requestProperty));
 				tros.writeObject(fd);
+				//fd.data_unit = DataUnit.client_data_unit(ClientDataUnit.client_property(clientProperty));
+				//tros.writeObject(fd);
 
-				fd.data_unit = DataUnit.client_data_unit(ClientDataUnit.resource_property(resourceProperty));
-				tros.writeObject(fd);
+				//fd.data_unit = DataUnit.client_data_unit(ClientDataUnit.request_property(requestProperty));
+				//tros.writeObject(fd);
 
-				fd.data_unit = DataUnit.client_data_unit(ClientDataUnit.client_request_edge(clientRequestEdge));
-				tros.writeObject(fd);
+				//fd.data_unit = DataUnit.client_data_unit(ClientDataUnit.resource_property(resourceProperty));
+				//tros.writeObject(fd);
 
-				fd.data_unit = DataUnit.client_data_unit(ClientDataUnit.request_resource_edge(requestResourceEdge));
-				tros.writeObject(fd);
+				//fd.data_unit = DataUnit.client_data_unit(ClientDataUnit.client_request_edge(clientRequestEdge));
+				//tros.writeObject(fd);
+
+				//fd.data_unit = DataUnit.client_data_unit(ClientDataUnit.request_resource_edge(requestResourceEdge));
+				//tros.writeObject(fd);
 
 			} else if("afterCall".equals(event.stage)) {
 				// Making Client Property
@@ -274,23 +284,33 @@ public class UIEventWriter {
 				Pedigree pedigree = new Pedigree();
 				pedigree.fresto_timestamp = receive_timestamp;
 
+				// Making Client Data Unit
+				ClientDataUnit clientDataUnit = new ClientDataUnit();
+				clientDataUnit.client_property = clientProperty;
+				clientDataUnit.response_property = responseProperty;
+				clientDataUnit.resource_property = resourceProperty;
+				clientDataUnit.resource_response_edge = resourceResponseEdge;;
+				clientDataUnit.response_client_edge = responseClientEdge;;
 				// Making required Fresto Data objects 
 				FrestoData fd = new FrestoData();
 				fd.pedigree = pedigree;
-				fd.data_unit = DataUnit.client_data_unit(ClientDataUnit.client_property(clientProperty));
-				tros.writeObject(fd);
+				fd.data_unit = DataUnit.client_data_unit(clientDataUnit);
 
-				fd.data_unit = DataUnit.client_data_unit(ClientDataUnit.response_property(responseProperty));
 				tros.writeObject(fd);
+				//fd.data_unit = DataUnit.client_data_unit(ClientDataUnit.client_property(clientProperty));
+				//tros.writeObject(fd);
 
-				fd.data_unit = DataUnit.client_data_unit(ClientDataUnit.resource_property(resourceProperty));
-				tros.writeObject(fd);
+				//fd.data_unit = DataUnit.client_data_unit(ClientDataUnit.response_property(responseProperty));
+				//tros.writeObject(fd);
 
-				fd.data_unit = DataUnit.client_data_unit(ClientDataUnit.resource_response_edge(resourceResponseEdge));
-				tros.writeObject(fd);
+				//fd.data_unit = DataUnit.client_data_unit(ClientDataUnit.resource_property(resourceProperty));
+				//tros.writeObject(fd);
 
-				fd.data_unit = DataUnit.client_data_unit(ClientDataUnit.response_client_edge(responseClientEdge));
-				tros.writeObject(fd);
+				//fd.data_unit = DataUnit.client_data_unit(ClientDataUnit.resource_response_edge(resourceResponseEdge));
+				//tros.writeObject(fd);
+
+				//fd.data_unit = DataUnit.client_data_unit(ClientDataUnit.response_client_edge(responseClientEdge));
+				//tros.writeObject(fd);
 			} 
 		} else {
 				LOGGER.warning("Event topic: " + topic + " not recognized"); 
