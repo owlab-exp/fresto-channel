@@ -24,7 +24,7 @@ public class SplitFrestoDataPailStructure extends FrestoDataPailStructure {
 			if(md instanceof StructMetaData && ((StructMetaData) md).structClass.getName().endsWith("Property")) {
 				fieldStruct = new PropertyStructure(((StructMetaData) md).structClass);
 			} else {
-				fieldStruct = new EdgeStructure();
+				fieldStruct = new EdgeStructure();  // endsWith("Edge")
 			}
 			validFieldMap.put(k.getThriftFieldId(), fieldStruct);
 		}
