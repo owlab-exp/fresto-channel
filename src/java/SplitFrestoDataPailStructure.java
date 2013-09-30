@@ -33,7 +33,7 @@ public class SplitFrestoDataPailStructure extends FrestoDataPailStructure {
 
 	public List<String> getTarget(FrestoData object) {
 		List<String> ret = new ArrayList<String>();
-		DataUnit du = object.getData_unit();
+		DataUnit du = object.getDataUnit();
 		short id = du.getSetField().getThriftFieldId();
 		ret.add("" + id);
 		validFieldMap.get(id).fillTarget(ret, du.getFieldValue());
