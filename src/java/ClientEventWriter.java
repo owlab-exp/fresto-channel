@@ -19,6 +19,8 @@ import fresto.event.HttpResponseEvent;
 
 import fresto.data.FrestoData;
 
+import fresto.pail.SplitFrestoDataPailStructure;
+
 import fresto.command.CommandEvent;
 
 public class ClientEventWriter {

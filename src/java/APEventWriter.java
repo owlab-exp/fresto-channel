@@ -18,6 +18,8 @@ import fresto.data.FrestoData;
 import fresto.data.DataUnit;
 import fresto.data.Pedigree;
 
+import fresto.pail.SplitFrestoDataPailStructure;
+
 import fresto.command.CommandEvent;
 
 public class APEventWriter {

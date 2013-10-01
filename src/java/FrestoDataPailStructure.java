@@ -1,3 +1,5 @@
+package fresto.pail;
+
 import fresto.data.FrestoData;
 
 import java.util.Collections;
