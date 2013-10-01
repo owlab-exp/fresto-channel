@@ -31,11 +31,14 @@ public class ClientEventWriter {
 	private static final String TOPIC_COMMAND_EVENT = "CMD";
 	private static TDeserializer deserializer = new TDeserializer(new TBinaryProtocol.Factory());
 	private static final SplitFrestoDataPailStructure pailStructure = new SplitFrestoDataPailStructure();
+	private Pail<FrestoData> pail;
 	private TypedRecordOutputStream tros;
 
 	public static void main(String[] args) throws Exception {
 
 		ClientEventWriter eventWriter = new ClientEventWriter();
+
+		eventWriter.createPail();
 
 		ZMQ.Context context = ZMQ.context(1);
 		ZMQ.Socket puller = context.socket(ZMQ.PULL);
@@ -68,9 +71,7 @@ public class ClientEventWriter {
 			// Append Pail Data
 			long startTime = System.currentTimeMillis();
 
-			eventWriter.openPail();
-			eventWriter.appendPailData(topic, eventBytes);
-			eventWriter.closePail();
+			eventWriter.writePailData(topic, eventBytes);
 
 			LOGGER.info("Time taken for writing: " + (System.currentTimeMillis() - startTime) + " ms");
 		}
@@ -79,47 +80,32 @@ public class ClientEventWriter {
 		context.term();
 	}
 
-	public void createPail() {
+	public void createNewPail() {
 		try {
-			if(tros == null) {
-				Pail<FrestoData> pail = Pail.create(HDFS_URL, pailStructure);
-				tros = pail.openWrite();
-			}
+			pail = Pail.create(HDFS_URL, pailStructure);
 		} catch(Exception e){
 			throw new RuntimeException(e);
 		}
 	}
 
-	public void openPail() {
+	public void createPail() {
 		try {
-			if(tros == null) {
-				Pail<FrestoData> pail = new Pail<FrestoData>(HDFS_URL);
-				tros = pail.openWrite();
+			if(pail == null) {
+				pail = new Pail<FrestoData>(HDFS_URL);
 			}
 		} catch(IOException e){
 			//throw new RuntimeException(e);
 			//e.printStackTrace();
-			LOGGER.info("Pail open failed, trying to create pail.");
-			createPail();
 		} catch(IllegalArgumentException e){
 			//throw new RuntimeException(e);
 			//e.printStackTrace();
-			LOGGER.info("Pail open failed, trying to create pail.");
-			createPail();
+			LOGGER.info("Pail object new failed, trying to create a pail structure.");
+			createNewPail();
 		}
 	}
 
-	public void closePail() {
-		try {
-			if(tros != null) 
-				tros.close();
-			tros = null;
-		} catch(Exception e) {
-			throw new RuntimeException(e);
-		}
-	}
-
-	public void appendPailData(String topic, byte[] eventBytes) throws TException, IOException {
+	public void writePailData(String topic, byte[] eventBytes) throws TException, IOException {
+		tros = pail.openWrite();
 		if(TOPIC_REQUEST.equals(topic) || TOPIC_RESPONSE.equals(topic)) {
 
 			FrestoData frestoData = new FrestoData();
@@ -128,5 +114,7 @@ public class ClientEventWriter {
 		} else {
 			LOGGER.warning("Event topic: " + topic + " not recognized. Possible valures: " + TOPIC_REQUEST + " or " + TOPIC_RESPONSE); 
 		}
+		tros.close();
 	}
 }
+
