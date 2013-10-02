@@ -8,7 +8,7 @@ import org.zeromq.ZMQ;
 import org.zeromq.ZMQ.Socket;
 
 public class FrestoEventQueue extends Thread {
-	Logger LOGGER = Logger.getLogger("EventQueue");
+	Logger LOGGER = Logger.getLogger("FrestoEventQueue");
 
 	private ConcurrentLinkedQueue<FrestoEvent> queue = new ConcurrentLinkedQueue<FrestoEvent>();
 	private AtomicBoolean work = new AtomicBoolean(true);
@@ -23,7 +23,7 @@ public class FrestoEventQueue extends Thread {
 			byte[] eventBytes = receiveSocket.recv(0);
 			FrestoEvent frestoEvent = new FrestoEvent(topic, eventBytes);
 			queue.add(frestoEvent);
-			LOGGER.info("EventQueue size = " + queue.size());
+			//LOGGER.fine("EventQueue size = " + queue.size());
 		}
 	}
 
