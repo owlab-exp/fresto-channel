@@ -1,3 +1,4 @@
+import java.util.Iterator;
 import java.util.logging.Logger;
 import java.io.IOException;
 
@@ -19,22 +20,28 @@ import fresto.event.HttpResponseEvent;
 
 import fresto.data.FrestoData;
 
-import fresto.pail.SplitFrestoDataPailStructure;
+//import fresto.pail.SplitFrestoDataPailStructure;
 
 import fresto.command.CommandEvent;
 
 public class ClientEventWriter {
 	private static String THIS_CLASS_NAME = "ClientEventWriter";
-	private static final String HDFS_URL = "hdfs://fresto1.owlab.com:9000/fresto/new";
 	private static Logger LOGGER = Logger.getLogger(THIS_CLASS_NAME);
+
+	private static final String HDFS_PATH = "hdfs://fresto1.owlab.com:9000/fresto/new";
 	private static final String ZMQ_URL = "tcp://fresto1.owlab.com:7004";
 	private static final String TOPIC_REQUEST = "CB";
 	private static final String TOPIC_RESPONSE = "CF";
 	private static final String TOPIC_COMMAND_EVENT = "CMD";
+	
 	private static TDeserializer deserializer = new TDeserializer(new TBinaryProtocol.Factory());
+	
 	private static final SplitFrestoDataPailStructure pailStructure = new SplitFrestoDataPailStructure();
 	private Pail<FrestoData> pail;
 	private TypedRecordOutputStream tros;
+
+	private static boolean work = true;
+	private static int SLEEP_TIME = 100;
 
 	public static void main(String[] args) throws Exception {
 
@@ -46,45 +53,60 @@ public class ClientEventWriter {
 		ZMQ.Socket puller = context.socket(ZMQ.PULL);
 		puller.connect(ZMQ_URL);
 
-		while(true) {
-		//for(int i = 0; i < 10; i++){
-			LOGGER.info("Waiting...");
-			String topic = new String(puller.recv(0));
-			//LOGGER.info("Topic=" + topic + " and matching=" + TOPIC_REQUEST.equals(topic));
+		//Consume socket data
+		FrestoEventQueue frestoEventQueue = new FrestoEventQueue(puller);
+		frestoEventQueue.start();
 
-			byte[] eventBytes = puller.recv(0);
-			LOGGER.info(eventBytes.length + " bytes received");
+		while(work) {
 
-			if(TOPIC_COMMAND_EVENT.equals(topic)) {
-				LOGGER.info("A command received.");
-				CommandEvent event = new CommandEvent();
-				deserializer.deserialize(event, eventBytes);
-				if(event.target_module.equalsIgnoreCase(THIS_CLASS_NAME)) {
-					if(event.command.equalsIgnoreCase("exit")) {
-						LOGGER.info("Perform command: " + event.command);
-						break;
-					} else {
-						LOGGER.warning("Unsupported command: " + event.command);
-						LOGGER.warning("Supported: exit");
+			// To add sufficient events to the queue
+			Thread.sleep(SLEEP_TIME);
+
+			int queueSize = frestoEventQueue.size();
+			
+			if(queueSize > 0) {
+				eventWriter.openRecordStream();
+
+				for(int i = 0; i < queueSize; i++) {
+					FrestoEvent frestoEvent = frestoEventQueue.poll(); 
+					if(TOPIC_COMMAND_EVENT.equals(frestoEvent.topic)) {
+						eventWriter.handleCommand(frestoEvent.topic, frestoEvent.eventBytes);
+						continue;
 					}
+					eventWriter.writePailData(frestoEvent.topic, frestoEvent.eventBytes);
 				}
+
+				eventWriter.closeRecordStream();
+				LOGGER.info(queueSize + " events processed.");
+			} else {
+				LOGGER.info(queueSize + " events.");
+
 			}
 
-			// Append Pail Data
-			long startTime = System.currentTimeMillis();
-
-			eventWriter.writePailData(topic, eventBytes);
-
-			LOGGER.info("Time taken for writing: " + (System.currentTimeMillis() - startTime) + " ms");
 		}
 
 		puller.close();
 		context.term();
 	}
 
+	public void handleCommand(String topic, byte[] eventBytes) throws TException {
+		LOGGER.info("A command received."); 
+		CommandEvent event = new CommandEvent(); 
+		deserializer.deserialize(event, eventBytes); 
+		if(event.target_module.equalsIgnoreCase(THIS_CLASS_NAME)) { 
+			if(event.command.equalsIgnoreCase("exit")) { 
+				LOGGER.info("Perform command: " + event.command); 
+				work = false; 
+			} else { 
+				LOGGER.warning("Unsupported command: " + event.command); 
+			} 
+		}
+	}
+
+
 	public void createNewPail() {
 		try {
-			pail = Pail.create(HDFS_URL, pailStructure);
+			pail = Pail.create(HDFS_PATH, pailStructure);
 		} catch(Exception e){
 			throw new RuntimeException(e);
 		}
@@ -93,7 +115,7 @@ public class ClientEventWriter {
 	public void createPail() {
 		try {
 			if(pail == null) {
-				pail = new Pail<FrestoData>(HDFS_URL);
+				pail = new Pail<FrestoData>(HDFS_PATH);
 			}
 		} catch(IOException e){
 			//throw new RuntimeException(e);
@@ -106,8 +128,16 @@ public class ClientEventWriter {
 		}
 	}
 
-	public void writePailData(String topic, byte[] eventBytes) throws TException, IOException {
+	public void openRecordStream() throws IOException {
 		tros = pail.openWrite();
+	}
+
+	public void closeRecordStream() throws IOException {
+		tros.close();
+	}
+
+	public void writePailData(String topic, byte[] eventBytes) throws TException, IOException {
+	//	tros = pail.openWrite();
 		if(TOPIC_REQUEST.equals(topic) || TOPIC_RESPONSE.equals(topic)) {
 
 			FrestoData frestoData = new FrestoData();
@@ -116,7 +146,7 @@ public class ClientEventWriter {
 		} else {
 			LOGGER.warning("Event topic: " + topic + " not recognized. Possible valures: " + TOPIC_REQUEST + " or " + TOPIC_RESPONSE); 
 		}
-		tros.close();
+	//	tros.close();
 	}
 }
 

@@ -1,4 +1,4 @@
-package fresto.pail;
+//package fresto.pail;
 
 import com.backtype.hadoop.pail.PailStructure;
 

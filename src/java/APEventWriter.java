@@ -18,24 +18,32 @@ import fresto.data.FrestoData;
 import fresto.data.DataUnit;
 import fresto.data.Pedigree;
 
-import fresto.pail.SplitFrestoDataPailStructure;
+//import fresto.pail.SplitFrestoDataPailStructure;
 
 import fresto.command.CommandEvent;
 
 public class APEventWriter {
+	// TODO ConcurrentLinkedQueue to reduce files
 	private static String THIS_CLASS_NAME = "APEventWriter";
 	private static Logger LOGGER = Logger.getLogger(THIS_CLASS_NAME);
+
+	private static final String HDFS_PATH = "hdfs://fresto1.owlab.com:9000/fresto/new";
 	private static final String ZMQ_URL = "tcp://fresto1.owlab.com:7005";
 	private static final String TOPIC_ENTRY_CALL = "EB";
 	private static final String TOPIC_ENTRY_RETURN = "EF";
 	private static final String TOPIC_COMMAND_EVENT = "CMD";
-	private static final String HDFS_PATH = "hdfs://fresto1.owlab.com:9000/fresto/new";
+
+	private static TDeserializer deserializer = new TDeserializer(new TBinaryProtocol.Factory());
+
 	private static final SplitFrestoDataPailStructure pailStructure = new SplitFrestoDataPailStructure();
 	private Pail<FrestoData> pail;
 	private TypedRecordOutputStream tros;
-	private static TDeserializer deserializer = new TDeserializer(new TBinaryProtocol.Factory());
+
+	private static boolean work = true;
+	private static int SLEEP_TIME = 100;
 
 	public static void main(String[] args) throws Exception {
+
 		APEventWriter eventWriter = new APEventWriter();
 
 		eventWriter.createPail();
@@ -44,43 +52,50 @@ public class APEventWriter {
 		ZMQ.Socket puller = context.socket(ZMQ.PULL);
 		puller.connect(ZMQ_URL);
 
+		FrestoEventQueue frestoEventQueue = new FrestoEventQueue(puller);
+		frestoEventQueue.start();
 
-		//puller.subscribe(TOPIC_ENTRY_CALL.getBytes());
-		//puller.subscribe(TOPIC_ENTRY_RETURN.getBytes());
-		//puller.subscribe(TOPIC_COMMAND_EVENT.getBytes());
+		while(work) {
 
-		while(true) {
-		//for(int i = 0; i < 10; i++){
-			LOGGER.info("Waiting...");
-			String topic = new String(puller.recv(0));
-			
-			byte[] eventBytes = puller.recv(0);
-			LOGGER.info(eventBytes.length + " bytes received");
+			Thread.sleep(SLEEP_TIME);
 
-			if(TOPIC_COMMAND_EVENT.equals(topic)) {
-				LOGGER.info("A command received.");
-				CommandEvent event = new CommandEvent();
-				deserializer.deserialize(event, eventBytes);
-				if(event.target_module.equalsIgnoreCase(THIS_CLASS_NAME)) {
-					if(event.command.equalsIgnoreCase("exit")) {
-						LOGGER.info("Perform command: " + event.command);
-						break;
-					} else {
-						LOGGER.warning("Unsupported command: " + event.command);
-						LOGGER.warning("Supported: exit");
+			int queueSize = frestoEventQueue.size();
+
+			if(queueSize > 0) {
+				eventWriter.openRecordStream();
+
+				for(int i = 0; i < queueSize; i++) {
+					FrestoEvent frestoEvent = frestoEventQueue.poll();
+					if(TOPIC_COMMAND_EVENT.equals(frestoEvent.topic)) {
+						eventWriter.handleCommand(frestoEvent.topic, frestoEvent.eventBytes);
+						continue;
 					}
+					eventWriter.writePailData(frestoEvent.topic, frestoEvent.eventBytes);
 				}
-			}
 
-			// Append Pail Data
-			long startTime = System.currentTimeMillis();
-			eventWriter.writePailData(topic, eventBytes, System.currentTimeMillis());
-			LOGGER.info("Time taken: " + (System.currentTimeMillis() - startTime) + " ms");	
+				eventWriter.closeRecordStream();
+				LOGGER.info(queueSize + " events processed.");
+			} else {
+			}
 		}
 
 		puller.close();
 		context.term();
-	}
+	} 
+
+	public void handleCommand(String topic, byte[] eventBytes) throws TException {
+                LOGGER.info("A command received.");
+                CommandEvent event = new CommandEvent();
+                deserializer.deserialize(event, eventBytes);
+                if(event.target_module.equalsIgnoreCase(THIS_CLASS_NAME)) {
+                        if(event.command.equalsIgnoreCase("exit")) {
+                                LOGGER.info("Perform command: " + event.command);
+                                work = false;
+                        } else {
+                                LOGGER.warning("Unsupported command: " + event.command);
+                        }
+                }
+        }
 
 	public void createNewPail() {
 		try {
@@ -107,24 +122,22 @@ public class APEventWriter {
 		}
 	}
 
-	//public void closePail() {
-	//	try {
-	//		if(tros != null) 
-	//			tros.close();
-	//		tros = null;
-	//	} catch(Exception e) {
-	//		throw new RuntimeException(e);
-	//	}
-	//}
+	public void openRecordStream() throws IOException {
+                tros = pail.openWrite();
+        }
 
-	public void writePailData(String topic, byte[] eventBytes, long timestamp) throws TException, IOException {
-		tros = pail.openWrite();
+        public void closeRecordStream() throws IOException {
+                tros.close();
+        }
+
+	public void writePailData(String topic, byte[] eventBytes) throws TException, IOException {
+		//tros = pail.openWrite();
 		if(TOPIC_ENTRY_CALL.equals(topic) || TOPIC_ENTRY_RETURN.equals(topic)) {
 			FrestoData frestoData = new FrestoData();
 			deserializer.deserialize(frestoData, eventBytes);
 			
 			Pedigree pedigree = new Pedigree();
-			pedigree.setReceivedTime(timestamp);
+			pedigree.setReceivedTime(System.currentTimeMillis());
 
 			frestoData.setPedigree(pedigree);
 
@@ -134,7 +147,7 @@ public class APEventWriter {
 		} else {
 			LOGGER.info("Topic not recognized: " + topic);
 		}
-		tros.close();
+		//tros.close();
 	}
 }
 
