@@ -15,9 +15,6 @@ import com.backtype.hadoop.pail.Pail;
 import com.backtype.hadoop.pail.PailStructure;
 import com.backtype.hadoop.pail.Pail.TypedRecordOutputStream;
 
-import fresto.event.HttpRequestEvent;
-import fresto.event.HttpResponseEvent;
-
 import fresto.data.FrestoData;
 
 //import fresto.pail.SplitFrestoDataPailStructure;
