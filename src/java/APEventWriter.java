@@ -76,6 +76,7 @@ public class APEventWriter {
 				eventWriter.closeRecordStream();
 				LOGGER.info(queueSize + " events processed.");
 			} else {
+				LOGGER.info(queueSize + " event.");
 			}
 		}
 
