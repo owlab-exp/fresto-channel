@@ -39,6 +39,7 @@ import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.sql.query.OSQLSynchQuery;
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.sql.OCommandSQL;
+import com.orientechnologies.orient.core.intent.OIntentMassiveInsert;
 
 public class OrientEventWriter {
 	private static String THIS_CLASS_NAME = "OrientEventWriter";
@@ -98,6 +99,9 @@ public class OrientEventWriter {
 			int queueSize = frestoEventQueue.size();
 			
 			if(queueSize > 0) {
+				// Condider this afterward
+				oGraph.declareIntent(new OIntentMassiveInsert());
+
 				for(int i = 0; i < queueSize; i++) {
 					FrestoEvent frestoEvent = frestoEventQueue.poll(); 
 					if(TOPIC_COMMAND_EVENT.equals(frestoEvent.topic)) {
@@ -106,6 +110,8 @@ public class OrientEventWriter {
 					}
 					eventWriter.writeEventData(frestoEvent.topic, frestoEvent.eventBytes);
 				}
+
+				oGraph.declareIntent(null);
 				LOGGER.info(queueSize + " events processed.");
 			} else {
 				LOGGER.info(queueSize + " events.");
@@ -137,6 +143,9 @@ public class OrientEventWriter {
 	public OGraphDatabase openDatabase() {
 		OGraphDatabase oGraph = new OGraphDatabase(DB_URL);
 		oGraph.open(DB_USER, DB_PASSWORD);
+		oGraph.setLockMode(OGraphDatabase.LOCK_MODE.NO_LOCKING);
+		//Not working
+		//oGraph.setRetainObjects(false);
 
 		return oGraph;
 	}
@@ -203,7 +212,6 @@ public class OrientEventWriter {
 
 				linkToTS(oGraph, requestE.getIdentity(), "request", requestEdge.timestamp);
 				
-				oGraph.commit();
 
 			} else if(frestoData.dataUnit.isSetResponseEdge()) {
 				ResponseEdge responseEdge = frestoData.dataUnit.getResponseEdge();
@@ -244,7 +252,6 @@ public class OrientEventWriter {
 
 				linkToTS(oGraph, responseE.getIdentity(), "response", responseEdge.timestamp);
 				//responseE.setProperties(props);
-				oGraph.commit();
 
 			} else if(frestoData.dataUnit.isSetEntryOperationCallEdge()) {
 				EntryOperationCallEdge entryOperationCallEdge = frestoData.dataUnit.getEntryOperationCallEdge();
@@ -319,7 +326,6 @@ public class OrientEventWriter {
 
 				linkToTS(oGraph, entryOperationCallE.getIdentity(), "entryCall", entryOperationCallEdge.timestamp);
 
-				oGraph.commit();
 
 
 			} else if(frestoData.dataUnit.isSetEntryOperationReturnEdge()) {
@@ -362,7 +368,6 @@ public class OrientEventWriter {
 
 				linkToTS(oGraph, entryOperationReturnE.getIdentity(), "entryReturn", entryOperationReturnEdge.timestamp);
 
-				oGraph.commit();
 
 			} else if(frestoData.dataUnit.isSetOperationCallEdge()) {
 			} else if(frestoData.dataUnit.isSetOperationReturnEdge()) {
@@ -426,59 +431,5 @@ public class OrientEventWriter {
 			linkToTS(oGraph, oRID, property, timestamp);
 		}
 	}
-
-
-
-        //public static Vertex findOrAddCustomVertex(OrientGraph oGraph, String klass, String key, int value) {
-        //        for(Vertex v: oGraph.getVerticesOfClass(klass)) {
-        //                if((Integer)v.getProperty(key) == value) {
-        //                        LOGGER.fine("Found a vertex");
-        //                        return v;
-        //                }
-        //        }
-
-        //        Vertex v =  oGraph.addVertex("class:" + klass);
-        //        v.setProperty(key, value);
-        //        return v;
-
-        //}
-
-        //public static Vertex findOrAddCustomVertex(OrientGraph oGraph, String klass, String keyOne, String valueOne, String keyTwo, String valueTwo) {
-        //        for(Vertex v: oGraph.getVerticesOfClass(klass)) {
-        //                if(v.getProperty(keyOne).equals(valueOne) && v.getProperty(keyTwo).equals(valueTwo)) {
-        //                        LOGGER.fine("Found a vertex");
-        //                        return v;
-        //                }
-        //        }
-
-        //        Vertex v =  oGraph.addVertex("class:" + klass);
-        //        v.setProperty(keyOne, valueOne);
-        //        v.setProperty(keyTwo, valueTwo);
-        //        return v;
-
-        //}
-
-	//public static Edge findOrMakeEdge(OrientGraph oGraph, Vertex sourceV, Vertex targetV, String edgeType) {
-	//	for(Edge e: sourceV.getEdges(Direction.OUT)) {
-	//		Vertex v = e.getVertex(Direction.OUT);
-	//		Set<String> keys = v.getPropertyKeys();
-	//		Iterator<String> it = keys.iterator();
-
-	//		boolean isSameVertex = true;
-	//		while(it.hasNext()) {
-	//			String key = it.next();
-	//			if(!v.getProperty(key).equals(targetV.getProperty(key))) {
-	//				isSameVertex = false;
-	//				break;
-	//			}
-	//		}
-
-	//		if(isSameVertex) {
-	//			return e;
-	//		} else {
-	//			return sourceV.addEdge(edgeType, targetV);
-	//		}
-	//	}
-	//}
 }
 
