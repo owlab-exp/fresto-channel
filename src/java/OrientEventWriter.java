@@ -35,11 +35,15 @@ import fresto.command.CommandEvent;
 //import com.tinkerpop.blueprints.Vertex;
 //import com.tinkerpop.blueprints.Edge;
 import com.orientechnologies.orient.core.db.graph.OGraphDatabase;
+import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.sql.query.OSQLSynchQuery;
-import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.sql.OCommandSQL;
+import com.orientechnologies.orient.core.index.OIndex;
 import com.orientechnologies.orient.core.intent.OIntentMassiveInsert;
+
+import org.perf4j.LoggingStopWatch;
+import org.perf4j.StopWatch;
 
 public class OrientEventWriter {
 	private static String THIS_CLASS_NAME = "OrientEventWriter";
@@ -69,6 +73,7 @@ public class OrientEventWriter {
 	
 
 	private static boolean work = true;
+	private static boolean sleepOn = false;
 	private static int SLEEP_TIME = 10;
 
 	private static OGraphDatabase oGraph;
@@ -94,12 +99,12 @@ public class OrientEventWriter {
 		while(work) {
 
 			// To add sufficient events to the queue
-			Thread.sleep(SLEEP_TIME);
+			if(sleepOn)
+				Thread.sleep(SLEEP_TIME);
 
 			int queueSize = frestoEventQueue.size();
 			
 			if(queueSize > 0) {
-				// Condider this afterward
 				oGraph.declareIntent(new OIntentMassiveInsert());
 
 				for(int i = 0; i < queueSize; i++) {
@@ -111,7 +116,9 @@ public class OrientEventWriter {
 					eventWriter.writeEventData(frestoEvent.topic, frestoEvent.eventBytes);
 				}
 
+				// Count this
 				oGraph.declareIntent(null);
+
 				LOGGER.info(queueSize + " events processed.");
 			} else {
 				LOGGER.info(queueSize + " events.");
@@ -119,6 +126,7 @@ public class OrientEventWriter {
 			}
 
 		}
+
 
 		oGraph.close();
 
@@ -143,7 +151,11 @@ public class OrientEventWriter {
 	public OGraphDatabase openDatabase() {
 		OGraphDatabase oGraph = new OGraphDatabase(DB_URL);
 		oGraph.open(DB_USER, DB_PASSWORD);
-		oGraph.setLockMode(OGraphDatabase.LOCK_MODE.NO_LOCKING);
+		//
+		//oGraph.setLockMode(OGraphDatabase.LOCK_MODE.NO_LOCKING);
+		//
+		// Condider this afterward
+		//oGraph.declareIntent(new OIntentMassiveInsert());
 		//Not working
 		//oGraph.setRetainObjects(false);
 
@@ -159,24 +171,34 @@ public class OrientEventWriter {
 			|| TOPIC_OPERATION_RETURN.equals(topic)
 			) {
 
+			//StopWatch _watch = new LoggingStopWatch("writeEventData");
+
 			FrestoData frestoData = new FrestoData();
+			//_watch.lap("frestoData new");
 			//Reuse
 			//frestoData.clear();
 			deserializer.deserialize(frestoData, eventBytes);
+			//_watch.lap("deserialize eventBytes");
 
 			Pedigree pedigree = new Pedigree();
                         pedigree.setReceivedTime(System.currentTimeMillis());
 
                         frestoData.setPedigree(pedigree);
+			//_watch.lap("setting pedigree");
 
 			if(frestoData.dataUnit.isSetRequestEdge()) {
+				oGraph.begin();
+
 				RequestEdge requestEdge = frestoData.dataUnit.getRequestEdge();
 				ClientID clientId = requestEdge.clientId;
 				ResourceID resourceId = requestEdge.resourceId;
+				//_watch.lap("Extract IDs");
 				//requestEdge.referrer;
 				//requestEdge.method;
 				//requestEdge.timestamp;
 				//requestEdge.uuid;
+
+				StopWatch _watch = new LoggingStopWatch("writeEventData");
 
 				OSQLSynchQuery<ODocument> oQuery = new OSQLSynchQuery<ODocument>();
 				Map<String, Object> params = new HashMap<String, Object>();
@@ -184,22 +206,28 @@ public class OrientEventWriter {
 				oQuery.setText("select from Client where ip = :ip");
 				params.put("ip", clientId.getClientIp());
 
+				//_watch.lap("Prepare query object");
 				//ODocument clientV = findOne(oGraph, oQuery, params);
 				ODocument clientV = findOne(oGraph, oQuery, params);
+				//_watch.lap("find a vertex");
 				if(clientV == null) {
 					clientV = oGraph.createVertex("Client")
 						.field("ip", clientId.getClientIp());
+					//_watch.lap("create a vertex");
 				}
 
 				oQuery.setText("select from Resource where url = :url");
 				params.clear();
 				params.put("url", resourceId.getUrl());
+				//_watch.lap("Prepare query object");
 
 				ODocument resourceV = findOne(oGraph, oQuery, params);
+				//_watch.lap("find a vertex");
 
 				if(resourceV == null) {
 					resourceV = oGraph.createVertex("Resource")
 						.field("url", resourceId.getUrl());
+					//_watch.lap("create a vertex");
 				}
 
 				ODocument requestE = oGraph.createEdge(clientV, resourceV, "RequestEdge")
@@ -208,12 +236,19 @@ public class OrientEventWriter {
 					.field("timestamp", requestEdge.timestamp)
 					.field("uuid", requestEdge.uuid);
 
+				//_watch.lap("create an edge");
+
 				requestE.save();
+				//_watch.lap("save edge and vertices");
+
+				oGraph.commit();
 
 				linkToTS(oGraph, requestE.getIdentity(), "request", requestEdge.timestamp);
-				
+				_watch.stop("Request edge processed");
 
 			} else if(frestoData.dataUnit.isSetResponseEdge()) {
+				oGraph.begin();
+
 				ResponseEdge responseEdge = frestoData.dataUnit.getResponseEdge();
 				ClientID clientId = responseEdge.clientId;
 				ResourceID resourceId = responseEdge.resourceId;
@@ -250,13 +285,19 @@ public class OrientEventWriter {
 
 				responseE.save();
 
+				oGraph.commit();
+
 				linkToTS(oGraph, responseE.getIdentity(), "response", responseEdge.timestamp);
 				//responseE.setProperties(props);
 
 			} else if(frestoData.dataUnit.isSetEntryOperationCallEdge()) {
+				oGraph.begin();
+
 				EntryOperationCallEdge entryOperationCallEdge = frestoData.dataUnit.getEntryOperationCallEdge();
 				ResourceID resourceId = entryOperationCallEdge.resourceId;
 				OperationID operationId = entryOperationCallEdge.OperationId;
+
+				StopWatch _watch = new LoggingStopWatch("writeEventData");
 
 				OSQLSynchQuery<ODocument> oQuery = new OSQLSynchQuery<ODocument>();
 				oQuery.setText("select from Host where hostName = :hostName");
@@ -323,12 +364,17 @@ public class OrientEventWriter {
 					.field("sequence", entryOperationCallEdge.sequence);
 
 				entryOperationCallE.save();
+				
+				oGraph.commit();
 
 				linkToTS(oGraph, entryOperationCallE.getIdentity(), "entryCall", entryOperationCallEdge.timestamp);
 
+				_watch.stop("EntryOperatioCallEdge processed");
 
 
 			} else if(frestoData.dataUnit.isSetEntryOperationReturnEdge()) {
+				oGraph.begin();
+
 				EntryOperationReturnEdge entryOperationReturnEdge = frestoData.dataUnit.getEntryOperationReturnEdge();
 				ResourceID resourceId = entryOperationReturnEdge.resourceId;
 				OperationID operationId = entryOperationReturnEdge.operationId;
@@ -366,6 +412,8 @@ public class OrientEventWriter {
 
 				entryOperationReturnE.save();
 
+				oGraph.commit();
+
 				linkToTS(oGraph, entryOperationReturnE.getIdentity(), "entryReturn", entryOperationReturnEdge.timestamp);
 
 
@@ -374,6 +422,7 @@ public class OrientEventWriter {
 			} else {
 				LOGGER.info("No data unit exist.");
 			}
+
 			
 		} else {
 			LOGGER.warning("Event topic: " + topic + " not recognized.");
@@ -389,6 +438,23 @@ public class OrientEventWriter {
                 return null;
 
         }
+
+	public static ODocument lookForVertex(OGraphDatabase oGraph, String indexName, Object key) {
+		ODocument vertex = null;
+		OIndex<?> idx = oGraph.getMetadata().getIndexManager().getIndex(indexName);
+		if(idx != null) {
+			OIdentifiable rec = (OIdentifiable) idx.get(key);
+			if(rec != null) {
+				vertex = oGraph.getRecord(rec);
+			} else {
+				LOGGER.info("ORID: " + rec + " does not exist");
+			}
+		} else {
+			LOGGER.info("INDEX: " + idx + " does not exist");
+		}
+
+		return vertex;
+	}
 
 	public static void linkToTS(OGraphDatabase oGraph, OIdentifiable oRID, String property, long timestamp) {
 		long second = (timestamp/1000) * 1000;
