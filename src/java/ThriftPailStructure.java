@@ -1,3 +1,5 @@
+//package fresto.pail;
+
 import com.backtype.hadoop.pail.PailStructure;
 
 import org.apache.thrift.TBase;

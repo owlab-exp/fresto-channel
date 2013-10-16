@@ -1,3 +1,5 @@
+//package fresto.pail;
+
 import java.util.List;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -24,7 +26,7 @@ public class SplitFrestoDataPailStructure extends FrestoDataPailStructure {
 			if(md instanceof StructMetaData && ((StructMetaData) md).structClass.getName().endsWith("Property")) {
 				fieldStruct = new PropertyStructure(((StructMetaData) md).structClass);
 			} else {
-				fieldStruct = new EdgeStructure();
+				fieldStruct = new EdgeStructure();  // endsWith("Edge")
 			}
 			validFieldMap.put(k.getThriftFieldId(), fieldStruct);
 		}
@@ -33,7 +35,7 @@ public class SplitFrestoDataPailStructure extends FrestoDataPailStructure {
 
 	public List<String> getTarget(FrestoData object) {
 		List<String> ret = new ArrayList<String>();
-		DataUnit du = object.getData_unit();
+		DataUnit du = object.getDataUnit();
 		short id = du.getSetField().getThriftFieldId();
 		ret.add("" + id);
 		validFieldMap.get(id).fillTarget(ret, du.getFieldValue());

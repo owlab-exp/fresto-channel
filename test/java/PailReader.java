@@ -20,7 +20,7 @@ public class PailReader {
 	public static void readData() throws IOException {
 		Pail<FrestoData> frestoDataPail = new Pail<FrestoData>(path);
 		for(FrestoData fd: frestoDataPail) {
-			System.out.println(fd.pedigree.fresto_timestamp);
+			System.out.println(fd.pedigree.receivedTime);
 		}
 
 	}
