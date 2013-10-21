@@ -45,7 +45,7 @@ import com.orientechnologies.orient.core.intent.OIntentMassiveInsert;
 import org.perf4j.LoggingStopWatch;
 import org.perf4j.StopWatch;
 
-public class OrientEventWriter {
+public class OrientEventWriter01 {
 	private static String THIS_CLASS_NAME = "OrientEventWriter";
 	private static Logger LOGGER = Logger.getLogger(THIS_CLASS_NAME);
 
@@ -78,7 +78,7 @@ public class OrientEventWriter {
 
 	private static OGraphDatabase oGraph;
 
-	public OrientEventWriter() {
+	public OrientEventWriter01() {
 		this.oGraph = openDatabase();
 
 	}
@@ -187,94 +187,237 @@ public class OrientEventWriter {
 			//_watch.lap("setting pedigree");
 
 			if(frestoData.dataUnit.isSetRequestEdge()) {
+				oGraph.begin();
 
 				RequestEdge requestEdge = frestoData.dataUnit.getRequestEdge();
 				ClientID clientId = requestEdge.clientId;
 				ResourceID resourceId = requestEdge.resourceId;
+				//_watch.lap("Extract IDs");
+				//requestEdge.referrer;
+				//requestEdge.method;
+				//requestEdge.timestamp;
+				//requestEdge.uuid;
 
-				StopWatch _watch = new LoggingStopWatch("Writing Request Event");
+				StopWatch _watch = new LoggingStopWatch("writeEventData");
 
-				ODocument request = oGraph.createVertex("Request")
-					.field("clientIp", clientId.getClientIp())
-					.field("url", resourceId.getUrl())
+				OSQLSynchQuery<ODocument> oQuery = new OSQLSynchQuery<ODocument>();
+				Map<String, Object> params = new HashMap<String, Object>();
+
+				oQuery.setText("select from Client where ip = :ip");
+				params.put("ip", clientId.getClientIp());
+
+				//_watch.lap("Prepare query object");
+				//ODocument clientV = findOne(oGraph, oQuery, params);
+				ODocument clientV = findOne(oGraph, oQuery, params);
+				//_watch.lap("find a vertex");
+				if(clientV == null) {
+					clientV = oGraph.createVertex("Client")
+						.field("ip", clientId.getClientIp());
+					//_watch.lap("create a vertex");
+				}
+
+				oQuery.setText("select from Resource where url = :url");
+				params.clear();
+				params.put("url", resourceId.getUrl());
+				//_watch.lap("Prepare query object");
+
+				ODocument resourceV = findOne(oGraph, oQuery, params);
+				//_watch.lap("find a vertex");
+
+				if(resourceV == null) {
+					resourceV = oGraph.createVertex("Resource")
+						.field("url", resourceId.getUrl());
+					//_watch.lap("create a vertex");
+				}
+
+				ODocument requestE = oGraph.createEdge(clientV, resourceV, "RequestEdge")
 					.field("referrer", requestEdge.referrer)
 					.field("method", requestEdge.method)
 					.field("timestamp", requestEdge.timestamp)
-					.field("uuid", requestEdge.uuid)
-					.save();
+					.field("uuid", requestEdge.uuid);
 
-				linkToTS(oGraph, request.getIdentity(), "request", requestEdge.timestamp);
-				_watch.stop("Request event processed");
+				//_watch.lap("create an edge");
+
+				requestE.save();
+				//_watch.lap("save edge and vertices");
+
+				oGraph.commit();
+
+				linkToTS(oGraph, requestE.getIdentity(), "request", requestEdge.timestamp);
+				_watch.stop("Request edge processed");
 
 			} else if(frestoData.dataUnit.isSetResponseEdge()) {
+				oGraph.begin();
 
 				ResponseEdge responseEdge = frestoData.dataUnit.getResponseEdge();
 				ClientID clientId = responseEdge.clientId;
 				ResourceID resourceId = responseEdge.resourceId;
+				
+				// find or make client vertex
+				OSQLSynchQuery<ODocument> oQuery = new OSQLSynchQuery<ODocument>();
+				oQuery.setText("select from Client where ip = :ip");
+				Map<String, Object> params = new HashMap<String, Object>();
+				params.put("ip", clientId.getClientIp());
 
-				StopWatch _watch = new LoggingStopWatch("Writing Response Event");
+				ODocument clientV = findOne(oGraph, oQuery, params);
+				if(clientV == null) {
+					clientV = oGraph.createVertex("Client")
+						.field("ip", clientId.getClientIp());
+				}
 
-				ODocument response = oGraph.createVertex("Response")
-					.field("clientIp", clientId.getClientIp())
-					.field("url", resourceId.getUrl())
+				// find or make resource vertex
+				oQuery.setText("select from Resource where url = :url");
+				params.clear();
+				params.put("url", resourceId.getUrl());
+
+				ODocument resourceV = findOne(oGraph, oQuery, params);
+
+				if(resourceV == null) {
+					resourceV = oGraph.createVertex("Resource")
+						.field("url", resourceId.getUrl());
+				}
+
+				ODocument responseE = oGraph.createEdge(resourceV, clientV, "ResponseEdge")
 					.field("httpStatus", responseEdge.httpStatus)
 					.field("elapsedTime", responseEdge.elapsedTime)
 					.field("timestamp", responseEdge.timestamp)
-					.field("uuid", responseEdge.uuid)
-					.save();
+					.field("uuid", responseEdge.uuid);
 
-				linkToTS(oGraph, response.getIdentity(), "response", responseEdge.timestamp);
-				_watch.stop("Response event processed");
+				responseE.save();
+
+				oGraph.commit();
+
+				linkToTS(oGraph, responseE.getIdentity(), "response", responseEdge.timestamp);
+				//responseE.setProperties(props);
 
 			} else if(frestoData.dataUnit.isSetEntryOperationCallEdge()) {
+				oGraph.begin();
 
 				EntryOperationCallEdge entryOperationCallEdge = frestoData.dataUnit.getEntryOperationCallEdge();
 				ResourceID resourceId = entryOperationCallEdge.resourceId;
 				OperationID operationId = entryOperationCallEdge.OperationId;
 
-				StopWatch _watch = new LoggingStopWatch("Writing EntryOperationCall");
+				StopWatch _watch = new LoggingStopWatch("writeEventData");
 
-				ODocument entryCall = oGraph.createVertex("EntryOperationCall")
-					.field("hostName", entryOperationCallEdge.localHost)
-					.field("contextPath", entryOperationCallEdge.contextPath)
-					.field("port", entryOperationCallEdge.localPort)
-					.field("servletPath", entryOperationCallEdge.servletPath)
-					.field("operationName", operationId.getOperationName())
-					.field("typeName", operationId.getTypeName())
+				OSQLSynchQuery<ODocument> oQuery = new OSQLSynchQuery<ODocument>();
+				oQuery.setText("select from Host where hostName = :hostName");
+				Map<String, Object> params = new HashMap<String, Object>();
+				params.put("hostName", entryOperationCallEdge.localHost);
+				ODocument hostV = findOne(oGraph, oQuery, params);
+
+				if(hostV == null) {
+					hostV = oGraph.createVertex("Host")
+						.field("hostName", entryOperationCallEdge.localHost);
+				}
+
+				oQuery.setText("select from WebApplication where contextPath = :contextPath and port = :port");
+				params.clear();
+				params.put("contextPath", entryOperationCallEdge.contextPath);
+				params.put("port", entryOperationCallEdge.localPort);
+				ODocument webApplicationV = findOne(oGraph, oQuery, params);
+
+				if(webApplicationV == null) {
+					webApplicationV = oGraph.createVertex("WebApplication")
+						.field("contextPath", entryOperationCallEdge.contextPath)
+						.field("port", entryOperationCallEdge.localPort);
+				}
+
+				Set<OIdentifiable> edgeSet0 = oGraph.getEdgesBetweenVertexes(hostV, webApplicationV);
+				if(edgeSet0.size() == 0) {
+					ODocument serveApplicationE = oGraph.createEdge(hostV, webApplicationV, "ServeApplicationEdge");
+					serveApplicationE.save();
+				}
+				
+				oQuery.setText("select from ManagedResource where servletPath = :servletPath");
+				params.clear();
+				params.put("servletPath", entryOperationCallEdge.servletPath);
+				ODocument managedResourceV = findOne(oGraph, oQuery, params);
+
+				if(managedResourceV == null) {
+					managedResourceV = oGraph.createVertex("ManagedResource")
+						.field("servletPath", entryOperationCallEdge.servletPath);
+				}
+
+				Set<OIdentifiable> edgeSet1 = oGraph.getEdgesBetweenVertexes(webApplicationV, managedResourceV); 
+				if(edgeSet1.size() == 0) { 
+					ODocument manageResourceE = oGraph.createEdge(webApplicationV, managedResourceV, "ManageResourceEdge"); 
+					manageResourceE.save();
+
+				}
+
+				oQuery.setText("select from Operation where operationName = :operationName and typeName = :typeName");
+				params.clear();
+				params.put("operationName", operationId.getOperationName());
+				params.put("typeName", operationId.getTypeName());
+				ODocument operationV = findOne(oGraph, oQuery, params);
+
+				if(operationV == null) {
+					operationV = oGraph.createVertex("Operation")
+						.field("operationName", operationId.getOperationName())
+						.field("typeName", operationId.getTypeName());
+				}
+
+				ODocument entryOperationCallE = oGraph.createEdge(managedResourceV, operationV, "EntryOperationCallEdge")
 					.field("httpMethod", entryOperationCallEdge.httpMethod)
-					.field("uuid", entryOperationCallEdge.uuid)
 					.field("timestamp", entryOperationCallEdge.timestamp)
-					.field("sequence", entryOperationCallEdge.sequence)
-					.save();
+					.field("uuid", entryOperationCallEdge.uuid)
+					.field("sequence", entryOperationCallEdge.sequence);
 
+				entryOperationCallE.save();
+				
+				oGraph.commit();
 
-				linkToTS(oGraph, entryCall.getIdentity(), "entryCall", entryOperationCallEdge.timestamp);
+				linkToTS(oGraph, entryOperationCallE.getIdentity(), "entryCall", entryOperationCallEdge.timestamp);
 
-				_watch.stop("EntryOperationCall event processed");
+				_watch.stop("EntryOperatioCallEdge processed");
 
 
 			} else if(frestoData.dataUnit.isSetEntryOperationReturnEdge()) {
+				oGraph.begin();
 
 				EntryOperationReturnEdge entryOperationReturnEdge = frestoData.dataUnit.getEntryOperationReturnEdge();
 				ResourceID resourceId = entryOperationReturnEdge.resourceId;
 				OperationID operationId = entryOperationReturnEdge.operationId;
 
-				StopWatch _watch = new LoggingStopWatch("Writing EntryOperationReturn");
+				OSQLSynchQuery<ODocument> oQuery = new OSQLSynchQuery<ODocument>();
+				Map<String, Object> params = new HashMap<String, Object>();
 
-				ODocument entryReturn = oGraph.createVertex("EntryOperationReturn")
-					.field("servletlPath", entryOperationReturnEdge.servletPath)
-					.field("operationName", operationId.getOperationName())
-					.field("typeName", operationId.getTypeName())
+				oQuery.setText("select from ManagedResource where servletPath = :servletPath");
+				params.clear();
+				params.put("servletPath", entryOperationReturnEdge.servletPath);
+				ODocument managedResourceV = findOne(oGraph, oQuery, params);
+
+				if(managedResourceV == null) {
+					managedResourceV = oGraph.createVertex("ManagedResource")
+						.field("servletPath", entryOperationReturnEdge.servletPath);
+				}
+
+				oQuery.setText("select from Operation where operationName = :operationName and typeName = :typeName");
+				params.clear();
+				params.put("operationName", operationId.getOperationName());
+				params.put("typeName", operationId.getTypeName());
+				ODocument operationV = findOne(oGraph, oQuery, params);
+
+				if(operationV == null) {
+					operationV = oGraph.createVertex("Operation")
+						.field("operationName", operationId.getOperationName())
+						.field("typeName", operationId.getTypeName());
+				}
+
+				ODocument entryOperationReturnE = oGraph.createEdge(operationV, managedResourceV, "EntryOperationReturnEdge")
 					.field("httpStatus", entryOperationReturnEdge.httpStatus)
 					.field("timestamp", entryOperationReturnEdge.timestamp)
 					.field("elapsedTime", entryOperationReturnEdge.elapsedTime)
-					.field("uuid", entryOperationReturnEdge.uuid)
-					.save();
+					.field("uuid", entryOperationReturnEdge.uuid);
 
-				linkToTS(oGraph, entryReturn.getIdentity(), "entryReturn", entryOperationReturnEdge.timestamp);
+				entryOperationReturnE.save();
 
-				_watch.stop("EntryOperationReturn event processed");
+				oGraph.commit();
 
+				linkToTS(oGraph, entryOperationReturnE.getIdentity(), "entryReturn", entryOperationReturnEdge.timestamp);
+
+
+			} else if(frestoData.dataUnit.isSetOperationCallEdge()) {
 			} else if(frestoData.dataUnit.isSetOperationReturnEdge()) {
 			} else {
 				LOGGER.info("No data unit exist.");
@@ -315,53 +458,40 @@ public class OrientEventWriter {
 
 	public static void linkToTS(OGraphDatabase oGraph, OIdentifiable oRID, String property, long timestamp) {
 		long second = (timestamp/1000) * 1000;
-		long minute = (timestamp/60000) * 60000;
-		//String second = "" + ((timestamp/1000) * 1000);
-		//String minute = "" + ((timestamp/60000) * 60000);
 
 		OSQLSynchQuery<ODocument> oQuery = new OSQLSynchQuery<ODocument>();
 		Map<String, Object> params = new HashMap<String, Object>();
 
-		oQuery.setText("select from TSRoot where minute = :minute");
-		params.put("minute", minute);
-		List<ODocument> rootDocs = oGraph.command(oQuery).execute(params);
+		oQuery.setText("select from TS where second = :second");
+		params.put("second", second);
+		List<ODocument> seconds = oGraph.command(oQuery).execute(params);
 
-		if(rootDocs.size() > 0) {
-			ODocument rootDoc = rootDocs.get(0);
-			Map<String, ODocument> secondMap = rootDoc.field("second");
-			ODocument secondDoc = secondMap.get(second);
-			if(secondDoc != null) {
-				// a map reated to the second exists
-				OCommandSQL cmd = new OCommandSQL();
-				cmd.setText("UPDATE " + secondDoc.getIdentity() + " ADD " + property + " = " + oRID);
-				int updated = oGraph.command(cmd).execute();
-			} else {
-				// a map reated to the second does not exist
-				OCommandSQL cmd = new OCommandSQL();
-				cmd.setText("INSERT INTO TSSecond (request, response, entryCall, entryReturn) values ([],[],[],[])");
-				secondDoc = oGraph.command(cmd).execute();
-
-				cmd.setText("UPDATE " + rootDoc.getIdentity() + " PUT second = \"" + second + "\", " + secondDoc.getIdentity());
-				int updated = oGraph.command(cmd).execute();
-				
-				linkToTS(oGraph, oRID, property, timestamp);
-
+		if(seconds.size() > 0) {
+			Set<OIdentifiable> edgeSet = oGraph.getOutEdges(seconds.get(0).getIdentity());
+			OIdentifiable edgeId = null;
+			for(OIdentifiable oid : edgeSet) {
+				edgeId = oid;
+				break; // because only one value
 			}
 
-		} else {
-			LOGGER.info("Creating TSSecond vertex...");
+			ODocument inVertex = oGraph.getInVertex(edgeId);
+
 			OCommandSQL cmd = new OCommandSQL();
-			cmd.setText("insert into TSSecond (request, response, entryCall, entryReturn) values ([],[],[],[])");
+			cmd.setText("update " + inVertex.getIdentity() + " add " + property + " = " + oRID);
+			int updated = oGraph.command(cmd).execute();
+
+		} else {
+			LOGGER.info("Creating TS vertex...");
+			OCommandSQL cmd = new OCommandSQL();
+			cmd.setText("insert into Second (request, response, entryCall, entryReturn, call, return) values ([],[],[],[],[],[])");
 			ODocument newSecondDoc = oGraph.command(cmd).execute();
 
-			LOGGER.info("Creating TSRoot vertex...");
-			ODocument newTSDoc = oGraph.createVertex("TSRoot")
-				.field("minute", minute)
-				.save();
+			ODocument newTSDoc = oGraph.createVertex("TS")
+				.field("second", second);
 
-			cmd.setText("UPDATE " + newTSDoc.getIdentity() + " PUT second = \"" + second + "\", " + newSecondDoc.getIdentity());
+			ODocument newEdge = oGraph.createEdge(newTSDoc, newSecondDoc);
 
-			oGraph.command(cmd).execute();
+			newEdge.save();
 
 			// call this method once again
 			linkToTS(oGraph, oRID, property, timestamp);
