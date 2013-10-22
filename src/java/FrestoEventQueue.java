@@ -6,6 +6,7 @@ import java.util.logging.Logger;
 
 import org.zeromq.ZMQ;
 import org.zeromq.ZMQ.Socket;
+import org.zeromq.ZMQException;
 
 public class FrestoEventQueue extends Thread {
 	Logger LOGGER = Logger.getLogger("FrestoEventQueue");
@@ -14,19 +15,40 @@ public class FrestoEventQueue extends Thread {
 	private AtomicBoolean work = new AtomicBoolean(true);
 	private ZMQ.Socket receiveSocket;
 
+	public FrestoEventQueue() {
+	}
+
 	public FrestoEventQueue(ZMQ.Socket receiveSocket) {
 		this.receiveSocket = receiveSocket;
 	}
 	public void run() {
+		LOGGER.info("Starting...");
+
+		if(receiveSocket == null) {
+			LOGGER.warning("ReceiveSocket not set");
+			return;
+		}
+
 		while(work.get()) {
-			String topic = new String(receiveSocket.recv(0)); 
-			byte[] eventBytes = receiveSocket.recv(0);
-			FrestoEvent frestoEvent = new FrestoEvent(topic, eventBytes);
-			queue.add(frestoEvent);
+			try {
+				String topic = new String(receiveSocket.recv(0)); 
+				byte[] eventBytes = receiveSocket.recv(0);
+				FrestoEvent frestoEvent = new FrestoEvent(topic, eventBytes);
+				queue.add(frestoEvent);
+			} catch(ZMQException e) {
+				if(e.getErrorCode() == ZMQ.Error.ETERM.getCode()){
+					LOGGER.info("Breaking...");
+					break;
+				}
+			}
 			//LOGGER.fine("EventQueue size = " + queue.size());
 		}
+		LOGGER.info("Shutting down...");
 	}
 
+	public void setPullerSocket(ZMQ.Socket receiveSocket) {
+		this.receiveSocket = receiveSocket;
+	}
 	public void stopWork() {
 		this.work.set(false);
 	}

@@ -84,54 +84,94 @@ public class OrientEventWriter {
 	}
 
 	public static void main(String[] args) throws Exception {
+		final ZMQ.Context context = ZMQ.context(1);
 
-		OrientEventWriter eventWriter = new OrientEventWriter();
+		final FrestoEventQueue frestoEventQueue = new FrestoEventQueue();
+
+		final Thread writerThread = new Thread() {
+			@Override
+			public void run() {
+				OrientEventWriter eventWriter = new OrientEventWriter();
 
 
-		ZMQ.Context context = ZMQ.context(1);
-		ZMQ.Socket puller = context.socket(ZMQ.PULL);
-		puller.connect(ZMQ_URL);
+				ZMQ.Socket puller = context.socket(ZMQ.PULL);
+				puller.connect(ZMQ_URL);
 
-		//Consume socket data
-		FrestoEventQueue frestoEventQueue = new FrestoEventQueue(puller);
-		frestoEventQueue.start();
+				//Consume socket data
+				//FrestoEventQueue frestoEventQueue = new FrestoEventQueue(puller);
+				frestoEventQueue.setPullerSocket(puller);
+				frestoEventQueue.start();
 
-		while(work) {
+				while(work) {
 
-			// To add sufficient events to the queue
-			if(sleepOn)
-				Thread.sleep(SLEEP_TIME);
-
-			int queueSize = frestoEventQueue.size();
-			
-			if(queueSize > 0) {
-				//oGraph.declareIntent(new OIntentMassiveInsert());
-
-				for(int i = 0; i < queueSize; i++) {
-					FrestoEvent frestoEvent = frestoEventQueue.poll(); 
-					if(TOPIC_COMMAND_EVENT.equals(frestoEvent.topic)) {
-						eventWriter.handleCommand(frestoEvent.topic, frestoEvent.eventBytes);
-						continue;
+					// To add sufficient events to the queue
+					if(sleepOn) {
+						try {
+							Thread.sleep(SLEEP_TIME);
+						} catch(InterruptedException ie) {
+						}
 					}
-					eventWriter.writeEventData(frestoEvent.topic, frestoEvent.eventBytes);
+
+					int queueSize = frestoEventQueue.size();
+					
+					if(queueSize > 0) {
+						//oGraph.declareIntent(new OIntentMassiveInsert());
+
+						for(int i = 0; i < queueSize; i++) {
+							FrestoEvent frestoEvent = frestoEventQueue.poll(); 
+							//To shutting down gracefully by using ZMQ but not used.
+							//if(TOPIC_COMMAND_EVENT.equals(frestoEvent.topic)) {
+							//	eventWriter.handleCommand(frestoEvent.topic, frestoEvent.eventBytes);
+							//	continue;
+							//}
+							try {
+								eventWriter.writeEventData(frestoEvent.topic, frestoEvent.eventBytes);
+							} catch(Exception te) {
+								LOGGER.warning("Exception occurred: " + te.getMessage());
+							}
+						}
+
+						// Count this
+						//oGraph.declareIntent(null);
+
+						LOGGER.info(queueSize + " events processed.");
+					} else {
+						LOGGER.info("No events.");
+
+					}
+
 				}
+				LOGGER.info("Shutting down...");
 
-				// Count this
-				//oGraph.declareIntent(null);
 
-				LOGGER.info(queueSize + " events processed.");
-			} else {
-				LOGGER.info(queueSize + " events.");
+				oGraph.close();
 
+				puller.close();
+				context.term();
+
+				LOGGER.info("Good bye.");
 			}
+		};
 
-		}
+		Runtime.getRuntime().addShutdownHook(new Thread() {
+         		@Override
+         		public void run() {
+         		   System.out.println("Interrupt received, killing server¡¦");
+			   // To break while clause
+			   frestoEventQueue.stopWork();
+			   work = false;
 
+         		  try {
+				  frestoEventQueue.join();
+				  writerThread.join();
 
-		oGraph.close();
+         		  } catch (InterruptedException e) {
+         		  }
+         		}
+      		});
 
-		puller.close();
-		context.term();
+		writerThread.start();
+
 	}
 
 	public void handleCommand(String topic, byte[] eventBytes) throws TException {

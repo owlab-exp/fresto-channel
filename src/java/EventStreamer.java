@@ -9,31 +9,51 @@ public  class EventStreamer extends  Thread implements Runnable {
 
 	private static int frontPort = 7001;
 	private static int backPort = 7002;
-	private ZMQ.Context ctx;
 
 	public  static void main(String[] args) {
-		ZMQ.Context context = ZMQ.context(1);
+		final ZMQ.Context context = ZMQ.context(1);
 
-		//ZMQ.Socket frontEnd = context.socket(ZMQ.XSUB);
-		ZMQ.Socket frontEnd = context.socket(ZMQ.SUB);
-		frontEnd.connect("tcp://*:" + frontPort);
-		frontEnd.subscribe("".getBytes());
+		final Thread zmqThread = new Thread() {
+			@Override
+			public void run() {
 
-		//ZMQ.Socket backEnd = context.socket(ZMQ.XPUB);
-		ZMQ.Socket backEnd = context.socket(ZMQ.PUSH);
-		backEnd.bind("tcp://*:" + backPort);
+				//ZMQ.Socket frontEnd = context.socket(ZMQ.XSUB);
+				ZMQ.Socket frontEnd = context.socket(ZMQ.SUB);
+				frontEnd.connect("tcp://*:" + frontPort);
+				frontEnd.subscribe("".getBytes());
 
-		LOGGER.info("Starting Streamer with " + frontPort + "/" + backPort);
+				//ZMQ.Socket backEnd = context.socket(ZMQ.XPUB);
+				ZMQ.Socket backEnd = context.socket(ZMQ.PUSH);
+				backEnd.bind("tcp://*:" + backPort);
 
-		
-		// Working!
-		//ZMQ.proxy(frontEnd, backEnd, null);
-		
-		// Working!
-		ZMQ.device(ZMQ.STREAMER, frontEnd, backEnd);
+				LOGGER.info("Starting Streamer with " + frontPort + "/" + backPort);
 
-		frontEnd.close();
-		backEnd.close();
-		context.term();
+				
+				// Working!
+				//ZMQ.proxy(frontEnd, backEnd, null);
+				
+				// Working!
+				ZMQ.device(ZMQ.STREAMER, frontEnd, backEnd);
+
+				frontEnd.close();
+				backEnd.close();
+			}
+		};
+
+		Runtime.getRuntime().addShutdownHook(new Thread() {
+			@Override
+			public void run() {
+				LOGGER.info("An interrupt received. Shutting down server...");
+				context.term();
+
+				try {
+					zmqThread.interrupt();
+					zmqThread.join();
+				} catch(InterruptedException e) {
+				}
+			}
+		});
+
+		zmqThread.start();
 	}
 }
