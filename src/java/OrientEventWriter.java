@@ -105,7 +105,7 @@ public class OrientEventWriter {
 			int queueSize = frestoEventQueue.size();
 			
 			if(queueSize > 0) {
-				oGraph.declareIntent(new OIntentMassiveInsert());
+				//oGraph.declareIntent(new OIntentMassiveInsert());
 
 				for(int i = 0; i < queueSize; i++) {
 					FrestoEvent frestoEvent = frestoEventQueue.poll(); 
@@ -117,7 +117,7 @@ public class OrientEventWriter {
 				}
 
 				// Count this
-				oGraph.declareIntent(null);
+				//oGraph.declareIntent(null);
 
 				LOGGER.info(queueSize + " events processed.");
 			} else {
@@ -151,6 +151,7 @@ public class OrientEventWriter {
 	public OGraphDatabase openDatabase() {
 		OGraphDatabase oGraph = new OGraphDatabase(DB_URL);
 		oGraph.open(DB_USER, DB_PASSWORD);
+		//oGraph.setMaxBufferSize(0);
 		//
 		//oGraph.setLockMode(OGraphDatabase.LOCK_MODE.NO_LOCKING);
 		//
@@ -329,6 +330,7 @@ public class OrientEventWriter {
 		if(rootDocs.size() > 0) {
 			ODocument rootDoc = rootDocs.get(0);
 			Map<String, ODocument> secondMap = rootDoc.field("second");
+			LOGGER.info("secondMap size = " + secondMap.size());
 			ODocument secondDoc = secondMap.get(second);
 			if(secondDoc != null) {
 				// a map reated to the second exists
