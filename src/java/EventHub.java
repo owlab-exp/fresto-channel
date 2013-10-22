@@ -8,33 +8,56 @@ public  class EventHub extends  Thread implements Runnable {
 	private static String THIS_CLASS_NAME = "EventHub";
 	private static Logger LOGGER = Logger.getLogger(THIS_CLASS_NAME);
 
-	private static int frontPort = 7000;
-	private static int backPort = 7001;
+	private static int frontPort = 7000; // 7000
+	private static int backPort = 7001; // 7001
 	private ZMQ.Context ctx;
 
 	public  static void main(String[] args) {
-		ZMQ.Context context = ZMQ.context(1);
+		final ZMQ.Context context = ZMQ.context(1);
 
-		//ZMQ.Socket frontEnd = context.socket(ZMQ.XSUB);
-		ZMQ.Socket frontEnd = context.socket(ZMQ.SUB);
-		frontEnd.bind("tcp://*:" + frontPort);
+		final Thread zmqThread = new Thread() {
+			@Override
+			public void run() {
 
-		//ZMQ.Socket backEnd = context.socket(ZMQ.XPUB);
-		ZMQ.Socket backEnd = context.socket(ZMQ.PUB);
-		backEnd.bind("tcp://*:" + backPort);
+				//ZMQ.Socket frontEnd = context.socket(ZMQ.XSUB);
+				ZMQ.Socket frontEnd = context.socket(ZMQ.SUB);
+				frontEnd.bind("tcp://*:" + frontPort);
 
-		LOGGER.info("Starting Forwarder with " + frontPort + "/" + backPort);
+				//ZMQ.Socket backEnd = context.socket(ZMQ.XPUB);
+				ZMQ.Socket backEnd = context.socket(ZMQ.PUB);
+				backEnd.bind("tcp://*:" + backPort);
 
-		frontEnd.subscribe("".getBytes());
-		
-		// Working!
-		//ZMQ.proxy(frontEnd, backEnd, null);
-		
-		// Working!
-		ZMQ.device(ZMQ.FORWARDER, frontEnd, backEnd);
+				LOGGER.info("Starting Forwarder with " + frontPort + "/" + backPort);
 
-		frontEnd.close();
-		backEnd.close();
-		context.term();
+				frontEnd.subscribe("".getBytes());
+				
+				// Working!
+				//ZMQ.proxy(frontEnd, backEnd, null);
+				
+				// Working!
+				ZMQ.device(ZMQ.FORWARDER, frontEnd, backEnd);
+
+				frontEnd.close();
+				backEnd.close();
+			}
+		};
+
+		Runtime.getRuntime().addShutdownHook(new Thread() {
+			@Override
+			public void run() {
+				LOGGER.info("Interrupt received. Shuting down server");
+				context.term();
+				
+				try {
+					zmqThread.interrupt();
+					zmqThread.join();
+				} catch(InterruptedException e) {
+					LOGGER.warning("Exception occurred: " + e.getMessage());
+				}
+			}
+		});
+
+		zmqThread.start();
+		//context.term();
 	}
 }
