@@ -35,6 +35,7 @@ import fresto.command.CommandEvent;
 //import com.tinkerpop.blueprints.Vertex;
 //import com.tinkerpop.blueprints.Edge;
 import com.orientechnologies.orient.core.db.graph.OGraphDatabase;
+import com.orientechnologies.orient.core.db.graph.OGraphDatabasePool;
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.sql.query.OSQLSynchQuery;
@@ -79,7 +80,7 @@ public class OrientEventWriter {
 	private static OGraphDatabase oGraph;
 
 	public OrientEventWriter() {
-		this.oGraph = openDatabase();
+		//this.oGraph = openDatabase();
 
 	}
 
@@ -115,20 +116,27 @@ public class OrientEventWriter {
 					int queueSize = frestoEventQueue.size();
 					
 					if(queueSize > 0) {
+
+						eventWriter.openDatabase();
 						//oGraph.declareIntent(new OIntentMassiveInsert());
 
-						for(int i = 0; i < queueSize; i++) {
-							FrestoEvent frestoEvent = frestoEventQueue.poll(); 
-							//To shutting down gracefully by using ZMQ but not used.
-							//if(TOPIC_COMMAND_EVENT.equals(frestoEvent.topic)) {
-							//	eventWriter.handleCommand(frestoEvent.topic, frestoEvent.eventBytes);
-							//	continue;
-							//}
-							try {
-								eventWriter.writeEventData(frestoEvent.topic, frestoEvent.eventBytes);
-							} catch(Exception te) {
-								LOGGER.warning("Exception occurred: " + te.getMessage());
+						try { // for database close finally
+
+							for(int i = 0; i < queueSize; i++) {
+								FrestoEvent frestoEvent = frestoEventQueue.poll(); 
+								//To shutting down gracefully by using ZMQ but not used.
+								//if(TOPIC_COMMAND_EVENT.equals(frestoEvent.topic)) {
+								//	eventWriter.handleCommand(frestoEvent.topic, frestoEvent.eventBytes);
+								//	continue;
+								//}
+								try {
+									eventWriter.writeEventData(frestoEvent.topic, frestoEvent.eventBytes);
+								} catch(Exception te) {
+									LOGGER.warning("Exception occurred: " + te.getMessage());
+								}
 							}
+						} finally {
+							oGraph.close();
 						}
 
 						// Count this
@@ -144,7 +152,7 @@ public class OrientEventWriter {
 				LOGGER.info("Shutting down...");
 
 
-				oGraph.close();
+				//oGraph.close();
 
 				puller.close();
 				context.term();
@@ -189,8 +197,13 @@ public class OrientEventWriter {
 	}
 
 	public OGraphDatabase openDatabase() {
-		OGraphDatabase oGraph = new OGraphDatabase(DB_URL);
-		oGraph.open(DB_USER, DB_PASSWORD);
+		//OGraphDatabase oGraph = new OGraphDatabase(DB_URL);
+		//oGraph = new OGraphDatabase(DB_URL);
+		OGraphDatabasePoolCustom oGraphPool = OGraphDatabasePoolCustom.global(1,3);
+		//OGraphDatabasePool oGraphPool = OGraphDatabasePool.global();
+		//oGraphPool.setup(1,2);
+		oGraph = oGraphPool.acquire(DB_URL, DB_USER, DB_PASSWORD);
+		//oGraph.open(DB_USER, DB_PASSWORD);
 		//oGraph.setMaxBufferSize(0);
 		//
 		//oGraph.setLockMode(OGraphDatabase.LOCK_MODE.NO_LOCKING);
@@ -244,8 +257,9 @@ public class OrientEventWriter {
 					.field("uuid", requestEdge.uuid)
 					.save();
 
+				_watch.lap("Request event processed");
 				linkToTS(oGraph, request.getIdentity(), "request", requestEdge.timestamp);
-				_watch.stop("Request event processed");
+				_watch.stop("Link event processed");
 
 			} else if(frestoData.dataUnit.isSetResponseEdge()) {
 
@@ -264,8 +278,9 @@ public class OrientEventWriter {
 					.field("uuid", responseEdge.uuid)
 					.save();
 
+				_watch.lap("Response event processed");
 				linkToTS(oGraph, response.getIdentity(), "response", responseEdge.timestamp);
-				_watch.stop("Response event processed");
+				_watch.stop("Link event processed");
 
 			} else if(frestoData.dataUnit.isSetEntryOperationCallEdge()) {
 
@@ -289,9 +304,11 @@ public class OrientEventWriter {
 					.save();
 
 
+				_watch.lap("EntryOperationCall event processed");
 				linkToTS(oGraph, entryCall.getIdentity(), "entryCall", entryOperationCallEdge.timestamp);
+				_watch.stop("Link event processed");
 
-				_watch.stop("EntryOperationCall event processed");
+
 
 
 			} else if(frestoData.dataUnit.isSetEntryOperationReturnEdge()) {
@@ -312,9 +329,10 @@ public class OrientEventWriter {
 					.field("uuid", entryOperationReturnEdge.uuid)
 					.save();
 
+				_watch.lap("EntryOperationReturn event processed");
 				linkToTS(oGraph, entryReturn.getIdentity(), "entryReturn", entryOperationReturnEdge.timestamp);
+				_watch.stop("Link event processed");
 
-				_watch.stop("EntryOperationReturn event processed");
 
 			} else if(frestoData.dataUnit.isSetOperationReturnEdge()) {
 			} else {
@@ -369,6 +387,7 @@ public class OrientEventWriter {
 
 		if(rootDocs.size() > 0) {
 			ODocument rootDoc = rootDocs.get(0);
+			// TODO how not to get map  object? I just want to know if the second key exists
 			Map<String, ODocument> secondMap = rootDoc.field("second");
 			LOGGER.info("secondMap size = " + secondMap.size());
 			ODocument secondDoc = secondMap.get(second);
