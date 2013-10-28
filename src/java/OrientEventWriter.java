@@ -35,7 +35,7 @@ import fresto.command.CommandEvent;
 //import com.tinkerpop.blueprints.Vertex;
 //import com.tinkerpop.blueprints.Edge;
 import com.orientechnologies.orient.core.db.graph.OGraphDatabase;
-import com.orientechnologies.orient.core.db.graph.OGraphDatabasePool;
+//import com.orientechnologies.orient.core.db.graph.OGraphDatabasePool;
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.sql.query.OSQLSynchQuery;
@@ -80,7 +80,7 @@ public class OrientEventWriter {
 	private static OGraphDatabase oGraph;
 
 	public OrientEventWriter() {
-		//this.oGraph = openDatabase();
+		//this.oGraph = setupDBConnection();
 
 	}
 
@@ -94,6 +94,9 @@ public class OrientEventWriter {
 			public void run() {
 				OrientEventWriter eventWriter = new OrientEventWriter();
 
+
+				// Open database
+				eventWriter.setupDBConnection();
 
 				ZMQ.Socket puller = context.socket(ZMQ.PULL);
 				puller.connect(ZMQ_URL);
@@ -117,8 +120,9 @@ public class OrientEventWriter {
 					
 					if(queueSize > 0) {
 
-						eventWriter.openDatabase();
+						//eventWriter.setupDBConnection();
 						//oGraph.declareIntent(new OIntentMassiveInsert());
+						oGraph.open(DB_USER, DB_PASSWORD);
 
 						try { // for database close finally
 
@@ -196,14 +200,24 @@ public class OrientEventWriter {
 		}
 	}
 
-	public OGraphDatabase openDatabase() {
+	public OGraphDatabase setupDBConnection() {
 		//OGraphDatabase oGraph = new OGraphDatabase(DB_URL);
-		//oGraph = new OGraphDatabase(DB_URL);
-		OGraphDatabasePoolCustom oGraphPool = OGraphDatabasePoolCustom.global(1,3);
+		oGraph = new OGraphDatabase(DB_URL);
+		oGraph.setProperty("minPool", 1);
+		oGraph.setProperty("maxPool", 3);
+		//if(oGraph.exists()) {
+		//oGraph.open(DB_USER, DB_PASSWORD);
+		// Not supported in remote mode
+		//oGraph.setLockMode(OGraphDatabase.LOCK_MODE.RECORD_LEVEL_LOCKING);
+		//} else {
+		//	LOGGER.severe(DB_URL + " : does not existk");
+		//	System.exit(-1);
+		//}
+		//OGraphDatabasePoolCustom oGraphPool = OGraphDatabasePoolCustom.global(1,3);
 		//OGraphDatabasePool oGraphPool = OGraphDatabasePool.global();
 		//oGraphPool.setup(1,2);
-		oGraph = oGraphPool.acquire(DB_URL, DB_USER, DB_PASSWORD);
-		//oGraph.open(DB_USER, DB_PASSWORD);
+		//LOGGER.info("Max connections = " + oGraphPool.getMaxSize());
+		//oGraph = oGraphPool.acquire(DB_URL, DB_USER, DB_PASSWORD);
 		//oGraph.setMaxBufferSize(0);
 		//
 		//oGraph.setLockMode(OGraphDatabase.LOCK_MODE.NO_LOCKING);
