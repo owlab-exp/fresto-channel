@@ -300,7 +300,7 @@ public class OrientEventWriter {
 
 				EntryOperationCallEdge entryOperationCallEdge = frestoData.dataUnit.getEntryOperationCallEdge();
 				ResourceID resourceId = entryOperationCallEdge.resourceId;
-				OperationID operationId = entryOperationCallEdge.OperationId;
+				OperationID operationId = entryOperationCallEdge.operationId;
 
 				StopWatch _watch = new LoggingStopWatch("Writing EntryOperationCall");
 
