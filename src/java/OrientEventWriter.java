@@ -57,7 +57,7 @@ import com.orientechnologies.orient.core.sql.OCommandSQL;
 import com.orientechnologies.orient.core.index.OIndex;
 import com.orientechnologies.orient.core.intent.OIntentMassiveInsert;
 
-import org.perf4j.LoggingStopWatch;
+import org.perf4j.javalog.JavaLogStopWatch;
 import org.perf4j.StopWatch;
 
 public class OrientEventWriter {
@@ -142,6 +142,8 @@ public class OrientEventWriter {
 			@Override
 			public void run() {
 				Logger _LOGGER = Logger.getLogger("writerThread");
+				StopWatch _watch = new JavaLogStopWatch(_LOGGER);
+
 				OrientEventWriter eventWriter = new OrientEventWriter();
 
 
@@ -172,7 +174,9 @@ public class OrientEventWriter {
 					if(queueSize > 0) {
 
 						//eventWriter.setupDBConnection();
+						_watch.start();
 						oGraph.open(dbUser, password);
+						_watch.lap("Process events", queueSize + " events");
 
 						try { // for database close finally
 
@@ -196,7 +200,8 @@ public class OrientEventWriter {
 						// Count this
 						//oGraph.declareIntent(null);
 
-						_LOGGER.info(queueSize + " events processed.");
+						_watch.stop("Process events", queueSize + " events processed");
+						//LOGGER.info(queueSize + " events processed");
 					} else {
 						_LOGGER.fine("No events.");
 
@@ -272,20 +277,18 @@ public class OrientEventWriter {
 			|| TOPIC_SQL_RETURN.equals(topic)
 			) {
 
-			//StopWatch _watch = new LoggingStopWatch("writeEventData");
-
 			FrestoData frestoData = new FrestoData();
-			//_watch.lap("frestoData new");
+			////_watch.lap("frestoData new");
 			//Reuse
 			//frestoData.clear();
 			deserializer.deserialize(frestoData, eventBytes);
-			//_watch.lap("deserialize eventBytes");
+			////_watch.lap("deserialize eventBytes");
 
 			Pedigree pedigree = new Pedigree();
                         pedigree.setReceivedTime(System.currentTimeMillis());
 
                         frestoData.setPedigree(pedigree);
-			//_watch.lap("setting pedigree");
+			////_watch.lap("setting pedigree");
 
 			if(frestoData.dataUnit.isSetRequestEdge()) {
 
@@ -293,7 +296,7 @@ public class OrientEventWriter {
 				ClientID clientId = requestEdge.clientId;
 				ResourceID resourceId = requestEdge.resourceId;
 
-				StopWatch _watch = new LoggingStopWatch("Writing Request Event");
+				//StopWatch _watch = new LoggingStopWatch("Writing Request Event");
 
 				ODocument request = oGraph.createVertex("Request")
 					.field("clientIp", clientId.getClientIp())
@@ -304,9 +307,9 @@ public class OrientEventWriter {
 					.field("uuid", requestEdge.uuid)
 					.save();
 
-				_watch.lap("Request event processed");
+				//_watch.lap("Request event processed");
 				linkToTS(oGraph, request.getIdentity(), "request", requestEdge.timestamp);
-				_watch.stop("Link event processed");
+				//_watch.stop("Link event processed");
 
 			} else if(frestoData.dataUnit.isSetResponseEdge()) {
 
@@ -314,7 +317,7 @@ public class OrientEventWriter {
 				ClientID clientId = responseEdge.clientId;
 				ResourceID resourceId = responseEdge.resourceId;
 
-				StopWatch _watch = new LoggingStopWatch("Writing Response Event");
+				//StopWatch _watch = new LoggingStopWatch("Writing Response Event");
 
 				ODocument response = oGraph.createVertex("Response")
 					.field("clientIp", clientId.getClientIp())
@@ -325,9 +328,9 @@ public class OrientEventWriter {
 					.field("uuid", responseEdge.uuid)
 					.save();
 
-				_watch.lap("Response event processed");
+				//_watch.lap("Response event processed");
 				linkToTS(oGraph, response.getIdentity(), "response", responseEdge.timestamp);
-				_watch.stop("Link event processed");
+				//_watch.stop("Link event processed");
 
 			} else if(frestoData.dataUnit.isSetEntryOperationCallEdge()) {
 
@@ -335,7 +338,7 @@ public class OrientEventWriter {
 				ResourceID resourceId = entryOperationCallEdge.resourceId;
 				OperationID operationId = entryOperationCallEdge.operationId;
 
-				StopWatch _watch = new LoggingStopWatch("Writing EntryOperationCall");
+				//StopWatch _watch = new LoggingStopWatch("Writing EntryOperationCall");
 
 				ODocument entryCall = oGraph.createVertex("EntryOperationCall")
 					.field("hostName", entryOperationCallEdge.localHost)
@@ -352,9 +355,9 @@ public class OrientEventWriter {
 					.save();
 
 
-				_watch.lap("EntryOperationCall event processed");
+				//_watch.lap("EntryOperationCall event processed");
 				linkToTS(oGraph, entryCall.getIdentity(), "entryCall", entryOperationCallEdge.timestamp);
-				_watch.stop("Link event processed");
+				//_watch.stop("Link event processed");
 
 
 
@@ -365,7 +368,7 @@ public class OrientEventWriter {
 				ResourceID resourceId = entryOperationReturnEdge.resourceId;
 				OperationID operationId = entryOperationReturnEdge.operationId;
 
-				StopWatch _watch = new LoggingStopWatch("Writing EntryOperationReturn");
+				//StopWatch _watch = new LoggingStopWatch("Writing EntryOperationReturn");
 
 				ODocument entryReturn = oGraph.createVertex("EntryOperationReturn")
 					.field("servletlPath", entryOperationReturnEdge.servletPath)
@@ -379,9 +382,9 @@ public class OrientEventWriter {
 					.field("depth", entryOperationReturnEdge.depth)
 					.save();
 
-				_watch.lap("EntryOperationReturn event processed");
+				//_watch.lap("EntryOperationReturn event processed");
 				linkToTS(oGraph, entryReturn.getIdentity(), "entryReturn", entryOperationReturnEdge.timestamp);
-				_watch.stop("Link event processed");
+				//_watch.stop("Link event processed");
 
 
 			} else if(frestoData.dataUnit.isSetOperationCallEdge()) {
@@ -389,7 +392,7 @@ public class OrientEventWriter {
 				OperationCallEdge operationCallEdge = frestoData.dataUnit.getOperationCallEdge();
 				OperationID operationId = operationCallEdge.operationId;
 
-				StopWatch _watch = new LoggingStopWatch("Writing OperationCall");
+				//StopWatch _watch = new LoggingStopWatch("Writing OperationCall");
 
 				ODocument operationCall = oGraph.createVertex("OperationCall")
 					.field("operationName", operationId.getOperationName())
@@ -400,15 +403,15 @@ public class OrientEventWriter {
 					.field("sequence", operationCallEdge.sequence)
 					.save();
 
-				_watch.lap("OperationCall event processed");
+				//_watch.lap("OperationCall event processed");
 				linkToTS(oGraph, operationCall.getIdentity(), "operationCall", operationCallEdge.timestamp);
-				_watch.stop("Link event processed");
+				//_watch.stop("Link event processed");
 
 			} else if(frestoData.dataUnit.isSetOperationReturnEdge()) {
 				OperationReturnEdge operationReturnEdge = frestoData.dataUnit.getOperationReturnEdge();
 				OperationID operationId = operationReturnEdge.operationId;
 
-				StopWatch _watch = new LoggingStopWatch("Writing OperationReturn");
+				//StopWatch _watch = new LoggingStopWatch("Writing OperationReturn");
 
 				ODocument operationReturn = oGraph.createVertex("OperationReturn")
 					.field("operationName", operationId.getOperationName())
@@ -420,15 +423,15 @@ public class OrientEventWriter {
 					.field("depth", operationReturnEdge.depth)
 					.save();
 
-				_watch.lap("OperationReturn event processed");
+				//_watch.lap("OperationReturn event processed");
 				linkToTS(oGraph, operationReturn.getIdentity(), "operationReturn", operationReturnEdge.timestamp);
-				_watch.stop("Link event processed");
+				//_watch.stop("Link event processed");
 			} else if(frestoData.dataUnit.isSetSqlCallEdge()) {
 
 				SqlCallEdge sqlCallEdge = frestoData.dataUnit.getSqlCallEdge();
 				SqlID sqlId = sqlCallEdge.sqlId;
 
-				StopWatch _watch = new LoggingStopWatch("Writing SqlCall");
+				//StopWatch _watch = new LoggingStopWatch("Writing SqlCall");
 
 				ODocument sqlCall = oGraph.createVertex("SqlCall")
 					.field("databaseUrl", sqlId.getDatabaseUrl())
@@ -439,15 +442,15 @@ public class OrientEventWriter {
 					.field("sequence", sqlCallEdge.sequence)
 					.save();
 
-				_watch.lap("SqlCall event processed");
+				//_watch.lap("SqlCall event processed");
 				linkToTS(oGraph, sqlCall.getIdentity(), "sqlCall", sqlCallEdge.timestamp);
-				_watch.stop("Link event processed");
+				//_watch.stop("Link event processed");
 
 			} else if(frestoData.dataUnit.isSetSqlReturnEdge()) {
 				SqlReturnEdge sqlReturnEdge = frestoData.dataUnit.getSqlReturnEdge();
 				SqlID sqlId = sqlReturnEdge.sqlId;
 
-				StopWatch _watch = new LoggingStopWatch("Writing SqlReturn");
+				//StopWatch _watch = new LoggingStopWatch("Writing SqlReturn");
 
 				ODocument sqlReturn = oGraph.createVertex("SqlReturn")
 					.field("databaseUrl", sqlId.getDatabaseUrl())
@@ -459,9 +462,9 @@ public class OrientEventWriter {
 					.field("sequence", sqlReturnEdge.sequence)
 					.save();
 
-				_watch.lap("SqlReturn event processed");
+				//_watch.lap("SqlReturn event processed");
 				linkToTS(oGraph, sqlReturn.getIdentity(), "sqlReturn", sqlReturnEdge.timestamp);
-				_watch.stop("Link event processed");
+				//_watch.stop("Link event processed");
 			} else {
 				LOGGER.info("No data unit exist.");
 			}
