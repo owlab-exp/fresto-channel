@@ -92,7 +92,7 @@ public class UUIDAggregator {
 
 	private static boolean work = true;
 	private static boolean sleepOn = false;
-	private static int SLEEP_TIME = 100;
+	private static int SLEEP_TIME = 10;
 
 	private static OGraphDatabase oGraph;
 
