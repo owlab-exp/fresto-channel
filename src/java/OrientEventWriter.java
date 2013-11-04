@@ -137,11 +137,27 @@ public class OrientEventWriter {
 		final ZMQ.Context context = ZMQ.context(1);
 
 		final FrestoEventQueue frestoEventQueue = new FrestoEventQueue();
-
-		final Thread writerThread = new Thread() {
+		
+		final Thread queueMonitorThread = new Thread() {
+			Logger _LOGGER = Logger.getLogger("writerThread");
 			@Override
 			public void run() {
-				Logger _LOGGER = Logger.getLogger("writerThread");
+				while(work) {
+					try {
+						_LOGGER.info("frestoEventQueue size = " + frestoEventQueue.size());
+						Thread.sleep(1000);
+					} catch(InterruptedException ie) {
+					}
+
+				}
+			}
+		};
+
+
+		final Thread writerThread = new Thread() {
+			Logger _LOGGER = Logger.getLogger("writerThread");
+			@Override
+			public void run() {
 				//StopWatch _watch = new JavaLogStopWatch(_LOGGER);
 				FrestoStopWatch _watch = new FrestoStopWatch();
 
@@ -167,7 +183,7 @@ public class OrientEventWriter {
 				frestoEventQueue.setPullerSocket(puller);
 				frestoEventQueue.start();
 				
-				int writeCount = 0;
+				//int writeCount = 0;
 
 				_watch.start();
 				
@@ -206,7 +222,7 @@ public class OrientEventWriter {
 								//}
 								try {
 									eventWriter.writeEventData(tempDoc, frestoEvent.topic, frestoEvent.eventBytes);
-									writeCount++;
+									//writeCount++;
 								} catch(Exception te) {
 									//_LOGGER.warning("Exception occurred: " + te.getMessage());
 									te.printStackTrace();
@@ -219,10 +235,10 @@ public class OrientEventWriter {
 						// Count this
 						//oGraph.declareIntent(null);
 
-						if(writeCount == 1000) {
-							LOGGER.info("time[" + _watch.lap() + "] " + writeCount + " events processed. Queue size = " + frestoEventQueue.size());
-							writeCount = 0;
-						}
+						//if(writeCount == 1000) {
+						//	LOGGER.info("time[" + _watch.lap() + "] " + writeCount + " events processed. Queue size = " + frestoEventQueue.size());
+						//	writeCount = 0;
+						//}
 						//LOGGER.info(queueSize + " events processed");
 					//} else {
 					//	_LOGGER.fine("No events.");
@@ -251,14 +267,16 @@ public class OrientEventWriter {
 			   work = false;
 
          		  try {
-				  frestoEventQueue.join();
 				  writerThread.join();
+				  frestoEventQueue.join();
+				  queueMonitorThread.join();
 
          		  } catch (InterruptedException e) {
          		  }
          		}
       		});
 
+		queueMonitorThread.start();
 		writerThread.start();
 
 	}
