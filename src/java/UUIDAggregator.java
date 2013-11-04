@@ -56,9 +56,9 @@ import com.orientechnologies.orient.core.sql.OCommandSQL;
 import com.orientechnologies.orient.core.index.OIndex;
 import com.orientechnologies.orient.core.intent.OIntentMassiveInsert;
 
-import org.perf4j.LoggingStopWatch;
-import org.perf4j.javalog.JavaLogStopWatch;
-import org.perf4j.StopWatch;
+//import org.perf4j.LoggingStopWatch;
+//import org.perf4j.javalog.JavaLogStopWatch;
+//import org.perf4j.StopWatch;
 
 /**
  * Aggregate individual events by UUID and sequence
@@ -92,7 +92,7 @@ public class UUIDAggregator {
 
 	private static boolean work = true;
 	private static boolean sleepOn = false;
-	private static int SLEEP_TIME = 10;
+	private static int SLEEP_TIME = 100;
 
 	private static OGraphDatabase oGraph;
 
@@ -124,7 +124,8 @@ public class UUIDAggregator {
 
 		final Thread allocatorThread = new Thread() {
 				Logger _LOGGER = Logger.getLogger("allocatorThread");
-				StopWatch _watch = new JavaLogStopWatch(_LOGGER);
+				//StopWatch _watch = new JavaLogStopWatch(_LOGGER);
+				FrestoStopWatch _watch = new FrestoStopWatch();
 			@Override
 			public void run() {
 				UUIDAggregator aggregator = new UUIDAggregator();
@@ -132,6 +133,11 @@ public class UUIDAggregator {
 
 				// Open database
 				aggregator.setupDBConnection();
+				if(oGraph.isClosed()) {
+					oGraph.open(dbUser, password);
+					_LOGGER.info("[Open DB] " + _watch.lap() + " ms");
+				}
+
 
 				ZMQ.Socket puller = context.socket(ZMQ.PULL);
 				puller.connect("tcp://" + frontHost + ":" + frontPort);
@@ -155,8 +161,10 @@ public class UUIDAggregator {
 					if(queueSize > 0) {
 
 						_watch.start();
-						oGraph.open(dbUser, password);
-						_watch.lap("Write", queueSize + " events to be processed");
+						if(oGraph.isClosed()) {
+							oGraph.open(dbUser, password);
+							_LOGGER.info("[Open DB] " + _watch.lap() + " ms. queueSize=" + queueSize);
+						}
 
 						try { // for database close finally
 
@@ -169,10 +177,10 @@ public class UUIDAggregator {
 								}
 							}
 						} finally {
-							oGraph.close();
+							//oGraph.close();
 						}
 
-						_watch.stop("Write", queueSize + " events processed");
+						_LOGGER.info("time[" + _watch.stop() + "] " + queueSize + " events processed");
 
 						//_LOGGER.info(queueSize + " events processed.");
 					} else {
@@ -183,6 +191,7 @@ public class UUIDAggregator {
 				}
 				_LOGGER.info("Shutting down...");
 
+				oGraph.close();
 
 				puller.close();
 				context.term();
