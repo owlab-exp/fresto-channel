@@ -57,6 +57,7 @@ import com.orientechnologies.orient.core.index.OIndex;
 import com.orientechnologies.orient.core.intent.OIntentMassiveInsert;
 
 import org.perf4j.LoggingStopWatch;
+import org.perf4j.javalog.JavaLogStopWatch;
 import org.perf4j.StopWatch;
 
 /**
@@ -123,6 +124,7 @@ public class UUIDAggregator {
 
 		final Thread allocatorThread = new Thread() {
 				Logger _LOGGER = Logger.getLogger("allocatorThread");
+				StopWatch _watch = new JavaLogStopWatch(_LOGGER);
 			@Override
 			public void run() {
 				UUIDAggregator aggregator = new UUIDAggregator();
@@ -152,7 +154,9 @@ public class UUIDAggregator {
 					
 					if(queueSize > 0) {
 
+						_watch.start();
 						oGraph.open(dbUser, password);
+						_watch.lap("Write", queueSize + " events to be processed");
 
 						try { // for database close finally
 
@@ -168,8 +172,9 @@ public class UUIDAggregator {
 							oGraph.close();
 						}
 
+						_watch.stop("Write", queueSize + " events processed");
 
-						_LOGGER.info(queueSize + " events processed.");
+						//_LOGGER.info(queueSize + " events processed.");
 					} else {
 						_LOGGER.fine("No events.");
 
