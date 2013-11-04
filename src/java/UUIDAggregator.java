@@ -122,6 +122,20 @@ public class UUIDAggregator {
 
 		final FrestoEventQueue frestoEventQueue = new FrestoEventQueue();
 
+		final Thread queueMonitorThread = new Thread() {
+			Logger _LOGGER = Logger.getLogger("aggregatorThread");
+			@Override
+			public void run() {
+				while(work) {
+					try {
+						_LOGGER.info("frestoEventQueue size = " + frestoEventQueue.size());
+						Thread.sleep(1000);
+					} catch(InterruptedException ie) {
+					}
+				}
+			}
+		};
+
 		final Thread aggregatorThread = new Thread() {
 				Logger _LOGGER = Logger.getLogger("aggregatorThread");
 				//StopWatch _watch = new JavaLogStopWatch(_LOGGER);
@@ -148,7 +162,7 @@ public class UUIDAggregator {
 				frestoEventQueue.setPullerSocket(puller);
 				frestoEventQueue.start();
 
-				int writeCount = 0;
+				//int writeCount = 0;
 
 				_watch.start();
 				while(work) {
@@ -180,7 +194,7 @@ public class UUIDAggregator {
 								FrestoEvent frestoEvent = frestoEventQueue.poll(); 
 								try {
 									aggregator.aggregateEventData(tempDoc, frestoEvent.topic, frestoEvent.eventBytes);
-									writeCount++;
+									//writeCount++;
 								} catch(Exception te) {
 									te.printStackTrace();
 								}
@@ -189,10 +203,10 @@ public class UUIDAggregator {
 							//oGraph.close();
 						}
 
-						if(writeCount == 1000) {
-							_LOGGER.info("time[" + _watch.lap() + "] " + writeCount + " event processed. Queue size = " + frestoEventQueue.size());
-							writeCount = 0;
-						}
+						//if(writeCount == 1000) {
+						//	_LOGGER.info("time[" + _watch.lap() + "] " + writeCount + " event processed. Queue size = " + frestoEventQueue.size());
+						//	writeCount = 0;
+						//}
 						//_LOGGER.info("time[" + _watch.stop() + "] " + queueSize + " events processed");
 
 						//_LOGGER.info(queueSize + " events processed.");
@@ -216,20 +230,22 @@ public class UUIDAggregator {
 		Runtime.getRuntime().addShutdownHook(new Thread() {
          		@Override
          		public void run() {
-         		   System.out.println("Interrupt received, killing server¡¦");
+         		   	System.out.println("Interrupt received, killing server¡¦");
 			   // To break while clause
-			   frestoEventQueue.stopWork();
-			   work = false;
+			   		frestoEventQueue.stopWork();
+			   		work = false;
 
-         		  try {
-				  frestoEventQueue.join();
-				  aggregatorThread.join();
+         		  	try {
+				  		frestoEventQueue.join();
+				  		aggregatorThread.join();
+				  		queueMonitorThread.join();
 
-         		  } catch (InterruptedException e) {
-         		  }
+         		  	} catch (InterruptedException e) {
+         		  	}
          		}
       		});
 
+		queueMonitorThread.start();
 		aggregatorThread.start();
 
 	}
