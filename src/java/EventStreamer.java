@@ -45,7 +45,7 @@ public  class EventStreamer extends  Thread implements Runnable {
 
 				//ZMQ.Socket frontEnd = context.socket(ZMQ.XSUB);
 				ZMQ.Socket frontEnd = context.socket(ZMQ.SUB);
-				frontEnd.connect("tcp://" + FRONT_HOST + ":" + BACK_PORT);
+				frontEnd.connect("tcp://" + FRONT_HOST + ":" + FRONT_PORT);
 				frontEnd.subscribe("".getBytes());
 
 				//ZMQ.Socket backEnd = context.socket(ZMQ.XPUB);
