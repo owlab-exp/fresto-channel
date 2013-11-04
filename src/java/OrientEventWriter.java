@@ -281,6 +281,7 @@ public class OrientEventWriter {
 		//OGraphDatabase oGraph = new OGraphDatabase(DB_URL);
 		LOGGER.info("Setting up connection to DB"); 
 		oGraph = new OGraphDatabase("remote:"+ dbHost + "/" + dbName);
+		oGraph.setRetainRecords(false);
 		oGraph.setProperty("minPool", 1);
 		oGraph.setProperty("maxPool", 3);
 
