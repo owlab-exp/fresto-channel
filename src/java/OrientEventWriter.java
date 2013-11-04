@@ -176,6 +176,7 @@ public class OrientEventWriter {
 						try {
 							_LOGGER.info("frestoEventQueue is empty. Waiting " + SLEEP_TIME + "ms...");
 							Thread.sleep(SLEEP_TIME);
+							continue;
 						} catch(InterruptedException ie) {
 						}
 					}
