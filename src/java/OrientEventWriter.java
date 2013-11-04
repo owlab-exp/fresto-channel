@@ -176,7 +176,7 @@ public class OrientEventWriter {
 						//eventWriter.setupDBConnection();
 						_watch.start();
 						oGraph.open(dbUser, password);
-						_watch.lap("Process events", queueSize + " events");
+						_watch.lap("Write", queueSize + " events to be processed");
 
 						try { // for database close finally
 
@@ -200,7 +200,7 @@ public class OrientEventWriter {
 						// Count this
 						//oGraph.declareIntent(null);
 
-						_watch.stop("Process events", queueSize + " events processed");
+						_watch.stop("Write", queueSize + " events processed");
 						//LOGGER.info(queueSize + " events processed");
 					} else {
 						_LOGGER.fine("No events.");
