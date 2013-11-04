@@ -122,8 +122,8 @@ public class UUIDAggregator {
 
 		final FrestoEventQueue frestoEventQueue = new FrestoEventQueue();
 
-		final Thread allocatorThread = new Thread() {
-				Logger _LOGGER = Logger.getLogger("allocatorThread");
+		final Thread aggregatorThread = new Thread() {
+				Logger _LOGGER = Logger.getLogger("aggregatorThread");
 				//StopWatch _watch = new JavaLogStopWatch(_LOGGER);
 				FrestoStopWatch _watch = new FrestoStopWatch();
 			@Override
@@ -146,47 +146,58 @@ public class UUIDAggregator {
 				frestoEventQueue.setPullerSocket(puller);
 				frestoEventQueue.start();
 
+				int writeCount = 0;
+
+				_watch.start();
 				while(work) {
 
 					// To add sufficient events to the queue
-					if(sleepOn) {
+					//if(sleepOn) {
+					if(frestoEventQueue.isEmpty()) {
 						try {
+							_LOGGER.info("frestoEventQueue is empty. Waiting " + SLEEP_TIME + "ms...");
 							Thread.sleep(SLEEP_TIME);
+							continue;
 						} catch(InterruptedException ie) {
 						}
 					}
 
-					int queueSize = frestoEventQueue.size();
+					//int queueSize = frestoEventQueue.size();
 					
-					if(queueSize > 0) {
+					//if(queueSize > 0) {
 
-						_watch.start();
+						//_watch.start();
 						if(oGraph.isClosed()) {
 							oGraph.open(dbUser, password);
-							_LOGGER.info("[Open DB] " + _watch.lap() + " ms. queueSize=" + queueSize);
+							_LOGGER.info("[Open DB] " + _watch.lap() + " ms.");// queueSize=" + queueSize);
 						}
 
 						try { // for database close finally
 
-							for(int i = 0; i < queueSize; i++) {
+							//for(int i = 0; i < queueSize; i++) {
 								FrestoEvent frestoEvent = frestoEventQueue.poll(); 
 								try {
 									aggregator.allocateEventData(frestoEvent.topic, frestoEvent.eventBytes);
+									writeCount++;
 								} catch(Exception te) {
 									te.printStackTrace();
 								}
-							}
+							//}
 						} finally {
 							//oGraph.close();
 						}
 
-						_LOGGER.info("time[" + _watch.stop() + "] " + queueSize + " events processed");
+						if(writeCount == 1000) {
+							_LOGGER.info("time[" + _watch.lap() + "] " + writeCount + " event processed. Queue size = " + frestoEventQueue.size());
+							writeCount = 0;
+						}
+						//_LOGGER.info("time[" + _watch.stop() + "] " + queueSize + " events processed");
 
 						//_LOGGER.info(queueSize + " events processed.");
-					} else {
-						_LOGGER.fine("No events.");
+					//} else {
+					//	_LOGGER.fine("No events.");
 
-					}
+					//}
 
 				}
 				_LOGGER.info("Shutting down...");
@@ -210,14 +221,14 @@ public class UUIDAggregator {
 
          		  try {
 				  frestoEventQueue.join();
-				  allocatorThread.join();
+				  aggregatorThread.join();
 
          		  } catch (InterruptedException e) {
          		  }
          		}
       		});
 
-		allocatorThread.start();
+		aggregatorThread.start();
 
 	}
 

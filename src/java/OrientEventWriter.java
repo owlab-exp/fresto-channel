@@ -164,31 +164,36 @@ public class OrientEventWriter {
 				//FrestoEventQueue frestoEventQueue = new FrestoEventQueue(puller);
 				frestoEventQueue.setPullerSocket(puller);
 				frestoEventQueue.start();
+				
+				int writeCount = 0;
 
+				_watch.start();
+				
 				while(work) {
 
 					// To add sufficient events to the queue
-					if(sleepOn) {
+					if(frestoEventQueue.isEmpty()) {
 						try {
+							_LOGGER.info("frestoEventQueue is empty. Waiting " + SLEEP_TIME + "ms...");
 							Thread.sleep(SLEEP_TIME);
 						} catch(InterruptedException ie) {
 						}
 					}
 
-					int queueSize = frestoEventQueue.size();
+					//int queueSize = frestoEventQueue.size();
 					
-					if(queueSize > 0) {
+					//if(queueSize > 0) {
 
 						//eventWriter.setupDBConnection();
-						_watch.start();
+						//_watch.start();
 						if(oGraph.isClosed()) {
 							oGraph.open(dbUser, password);
-							LOGGER.warning("[Open DB] time[" + _watch.lap() + "]");
+							LOGGER.warning("[Open DB] " + _watch.lap() + " ms.");
 						}
 
 						try { // for database close finally
 
-							for(int i = 0; i < queueSize; i++) {
+							//for(int i = 0; i < queueSize; i++) {
 								FrestoEvent frestoEvent = frestoEventQueue.poll(); 
 								//To shutting down gracefully by using ZMQ but not used.
 								//if(TOPIC_COMMAND_EVENT.equals(frestoEvent.topic)) {
@@ -197,10 +202,12 @@ public class OrientEventWriter {
 								//}
 								try {
 									eventWriter.writeEventData(frestoEvent.topic, frestoEvent.eventBytes);
+									writeCount++;
 								} catch(Exception te) {
-									_LOGGER.warning("Exception occurred: " + te.getMessage());
+									//_LOGGER.warning("Exception occurred: " + te.getMessage());
+									te.printStackTrace();
 								}
-							}
+							//}
 						} finally {
 							//oGraph.close();
 						}
@@ -208,12 +215,15 @@ public class OrientEventWriter {
 						// Count this
 						//oGraph.declareIntent(null);
 
-						LOGGER.info("time[" + _watch.stop() + "] " + queueSize + " events processed");
+						if(writeCount == 1000) {
+							LOGGER.info("time[" + _watch.lap() + "] " + writeCount + " events processed. Queue size = " + frestoEventQueue.size());
+							writeCount = 0;
+						}
 						//LOGGER.info(queueSize + " events processed");
-					} else {
-						_LOGGER.fine("No events.");
+					//} else {
+					//	_LOGGER.fine("No events.");
 
-					}
+					//}
 
 				}
 				_LOGGER.info("Shutting down...");
