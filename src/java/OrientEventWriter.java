@@ -519,7 +519,7 @@ public class OrientEventWriter {
 			ODocument rootDoc = rootDocs.get(0);
 			// TODO how not to get map  object? I just want to know if the second key exists
 			Map<String, ODocument> secondMap = rootDoc.field("second");
-			LOGGER.info("secondMap size = " + secondMap.size());
+			//LOGGER.info("secondMap size = " + secondMap.size());
 			ODocument secondDoc = secondMap.get(second);
 			if(secondDoc != null) {
 				// a map reated to the second exists
