@@ -142,7 +142,8 @@ public class OrientEventWriter {
 			@Override
 			public void run() {
 				Logger _LOGGER = Logger.getLogger("writerThread");
-				StopWatch _watch = new JavaLogStopWatch(_LOGGER);
+				//StopWatch _watch = new JavaLogStopWatch(_LOGGER);
+				FrestoStopWatch _watch = new FrestoStopWatch();
 
 				OrientEventWriter eventWriter = new OrientEventWriter();
 
@@ -150,6 +151,11 @@ public class OrientEventWriter {
 				// Open database
 				//_LOGGER.info("Setup DB Connection");
 				eventWriter.setupDBConnection();
+				if(oGraph.isClosed()) {
+					oGraph.open(dbUser, password);
+					LOGGER.info("[Open DB] time[" + _watch.lap() + "]");
+				}
+
 
 				ZMQ.Socket puller = context.socket(ZMQ.PULL);
 				puller.connect("tcp://" + frontHost + ":" + frontPort);
@@ -175,8 +181,10 @@ public class OrientEventWriter {
 
 						//eventWriter.setupDBConnection();
 						_watch.start();
-						oGraph.open(dbUser, password);
-						_watch.lap("Write", queueSize + " events to be processed");
+						if(oGraph.isClosed()) {
+							oGraph.open(dbUser, password);
+							LOGGER.warning("[Open DB] time[" + _watch.lap() + "]");
+						}
 
 						try { // for database close finally
 
@@ -194,13 +202,13 @@ public class OrientEventWriter {
 								}
 							}
 						} finally {
-							oGraph.close();
+							//oGraph.close();
 						}
 
 						// Count this
 						//oGraph.declareIntent(null);
 
-						_watch.stop("Write", queueSize + " events processed");
+						LOGGER.info("time[" + _watch.stop() + "] " + queueSize + " events processed");
 						//LOGGER.info(queueSize + " events processed");
 					} else {
 						_LOGGER.fine("No events.");
@@ -211,7 +219,7 @@ public class OrientEventWriter {
 				_LOGGER.info("Shutting down...");
 
 
-				//oGraph.close();
+				oGraph.close();
 
 				puller.close();
 				context.term();
