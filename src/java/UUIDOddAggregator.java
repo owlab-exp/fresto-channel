@@ -56,8 +56,9 @@ import com.orientechnologies.orient.core.sql.OCommandSQL;
 import com.orientechnologies.orient.core.index.OIndex;
 import com.orientechnologies.orient.core.intent.OIntentMassiveInsert;
 
-import org.perf4j.LoggingStopWatch;
-import org.perf4j.StopWatch;
+//import org.perf4j.LoggingStopWatch;
+//import org.perf4j.javalog.JavaLogStopWatch;
+//import org.perf4j.StopWatch;
 
 /**
  * Aggregate individual events by UUID and sequence
@@ -89,7 +90,7 @@ public class UUIDOddAggregator {
 	private static TDeserializer deserializer = new TDeserializer(new TBinaryProtocol.Factory());
 	
 
-	private static boolean work = true;
+	private static volatile boolean work = true;
 	private static boolean sleepOn = false;
 	private static int SLEEP_TIME = 10;
 
@@ -121,8 +122,24 @@ public class UUIDOddAggregator {
 
 		final FrestoEventSubQueue frestoEventQueue = new FrestoEventSubQueue();
 
-		final Thread allocatorThread = new Thread() {
-				Logger _LOGGER = Logger.getLogger("allocatorThread");
+		final Thread queueMonitorThread = new Thread() {
+			Logger _LOGGER = Logger.getLogger("aggregatorThread");
+			@Override
+			public void run() {
+				while(work) {
+					try {
+						_LOGGER.info("frestoEventQueue size = " + frestoEventQueue.size());
+						Thread.sleep(1000);
+					} catch(InterruptedException ie) {
+					}
+				}
+			}
+		};
+
+		final Thread aggregatorThread = new Thread() {
+				Logger _LOGGER = Logger.getLogger("aggregatorThread");
+				//StopWatch _watch = new JavaLogStopWatch(_LOGGER);
+				FrestoStopWatch _watch = new FrestoStopWatch();
 			@Override
 			public void run() {
 				UUIDOddAggregator aggregator = new UUIDOddAggregator();
@@ -130,54 +147,79 @@ public class UUIDOddAggregator {
 
 				// Open database
 				aggregator.setupDBConnection();
+				ODocument tempDoc = null;
+				if(oGraph.isClosed()) {
+					oGraph.open(dbUser, password);
+					tempDoc = oGraph.createVertex();
+					_LOGGER.info("[Open DB] " + _watch.lap() + " ms");
+				}
+
 
 				ZMQ.Socket subscriber = context.socket(ZMQ.SUB);
 				subscriber.connect("tcp://" + frontHost + ":" + frontPort);
+				subscriber.subscribe("".getBytes());
 
 				//Consume socket data
-				frestoEventQueue.setReceiveSocket(subscriber);
+				frestoEventQueue.setSubSocket(subscriber);
 				frestoEventQueue.start();
 
+				//int writeCount = 0;
+
+				_watch.start();
 				while(work) {
 
 					// To add sufficient events to the queue
-					if(sleepOn) {
+					//if(sleepOn) {
+					if(frestoEventQueue.isEmpty()) {
 						try {
+							_LOGGER.info("frestoEventQueue is empty. Waiting " + SLEEP_TIME + "ms...");
 							Thread.sleep(SLEEP_TIME);
+							continue;
 						} catch(InterruptedException ie) {
 						}
 					}
 
-					int queueSize = frestoEventQueue.size();
+					//int queueSize = frestoEventQueue.size();
 					
-					if(queueSize > 0) {
+					//if(queueSize > 0) {
 
-						oGraph.open(dbUser, password);
+						//_watch.start();
+						if(oGraph.isClosed()) {
+							oGraph.open(dbUser, password);
+							_LOGGER.info("[Open DB] " + _watch.lap() + " ms.");// queueSize=" + queueSize);
+						}
 
 						try { // for database close finally
 
-							for(int i = 0; i < queueSize; i++) {
+							//for(int i = 0; i < queueSize; i++) {
 								FrestoEvent frestoEvent = frestoEventQueue.poll(); 
 								try {
-									aggregator.allocateEventData(frestoEvent.topic, frestoEvent.eventBytes);
+									aggregator.aggregateEventData(tempDoc, frestoEvent.topic, frestoEvent.eventBytes);
+									//writeCount++;
 								} catch(Exception te) {
 									te.printStackTrace();
 								}
-							}
+							//}
 						} finally {
-							oGraph.close();
+							//oGraph.close();
 						}
 
+						//if(writeCount == 1000) {
+						//	_LOGGER.info("time[" + _watch.lap() + "] " + writeCount + " event processed. Queue size = " + frestoEventQueue.size());
+						//	writeCount = 0;
+						//}
+						//_LOGGER.info("time[" + _watch.stop() + "] " + queueSize + " events processed");
 
-						_LOGGER.info(queueSize + " events processed.");
-					} else {
-						_LOGGER.fine("No events.");
+						//_LOGGER.info(queueSize + " events processed.");
+					//} else {
+					//	_LOGGER.fine("No events.");
 
-					}
+					//}
 
 				}
 				_LOGGER.info("Shutting down...");
 
+				oGraph.close();
 
 				subscriber.close();
 				context.term();
@@ -189,21 +231,23 @@ public class UUIDOddAggregator {
 		Runtime.getRuntime().addShutdownHook(new Thread() {
          		@Override
          		public void run() {
-         		   System.out.println("Interrupt received, killing server¡¦");
+         		   	System.out.println("Interrupt received, killing server¡¦");
 			   // To break while clause
-			   frestoEventQueue.stopWork();
-			   work = false;
+			   		frestoEventQueue.stopWork();
+			   		work = false;
 
-         		  try {
-				  frestoEventQueue.join();
-				  allocatorThread.join();
+         		  	try {
+				  		frestoEventQueue.join();
+				  		aggregatorThread.join();
+				  		queueMonitorThread.join();
 
-         		  } catch (InterruptedException e) {
-         		  }
+         		  	} catch (InterruptedException e) {
+         		  	}
          		}
       		});
 
-		allocatorThread.start();
+		queueMonitorThread.start();
+		aggregatorThread.start();
 
 	}
 
@@ -211,6 +255,7 @@ public class UUIDOddAggregator {
 		//OGraphDatabase oGraph = new OGraphDatabase(DB_URL);
 		LOGGER.info("Setting up connection to DB"); 
 		oGraph = new OGraphDatabase("remote:"+ dbHost + "/" + dbName);
+		//oGraph.setRetainRecords(false);
 		oGraph.setProperty("minPool", 1);
 		oGraph.setProperty("maxPool", 3);
 
@@ -218,7 +263,7 @@ public class UUIDOddAggregator {
 		return oGraph;
 	}
 
-	public void allocateEventData(String topic, byte[] eventBytes) throws TException, IOException {
+	public void aggregateEventData(ODocument tempDoc, String topic, byte[] eventBytes) throws TException, IOException {
 		if(TOPIC_REQUEST.equals(topic) 
 			|| TOPIC_RESPONSE.equals(topic)
 			|| TOPIC_ENTRY_CALL.equals(topic)
@@ -236,6 +281,10 @@ public class UUIDOddAggregator {
 			//frestoData.clear();
 			deserializer.deserialize(frestoData, eventBytes);
 			//_watch.lap("deserialize eventBytes");
+			
+			if(!isOdd(frestoData)) {
+				return;
+			}
 
 			Pedigree pedigree = new Pedigree();
                         pedigree.setReceivedTime(System.currentTimeMillis());
@@ -243,12 +292,11 @@ public class UUIDOddAggregator {
                         frestoData.setPedigree(pedigree);
 			//_watch.lap("setting pedigree");
 
+			tempDoc.reset();
+
 			if(frestoData.dataUnit.isSetRequestEdge()) {
 
 				RequestEdge requestEdge = frestoData.dataUnit.getRequestEdge();
-				if(!isOdd(requestEdge.uuid)) {
-					return;
-				}
 				ClientID clientId = requestEdge.clientId;
 				ResourceID resourceId = requestEdge.resourceId;
 
@@ -257,25 +305,24 @@ public class UUIDOddAggregator {
 				//
 				//StopWatch _watch = new LoggingStopWatch("Writing Request Event");
 
-				ODocument request = oGraph.createVertex("Request")
-					.field("clientIp", clientId.getClientIp())
-					.field("url", resourceId.getUrl())
-					.field("referrer", requestEdge.referrer)
-					.field("method", requestEdge.method)
-					.field("timestamp", requestEdge.timestamp)
-					.field("uuid", requestEdge.uuid)
-					.save();
+				//ODocument request = oGraph.createVertex("Request")
+				tempDoc.setClassName("Request");
+				tempDoc.field("clientIp", clientId.getClientIp());
+				tempDoc.field("url", resourceId.getUrl());
+				tempDoc.field("referrer", requestEdge.referrer);
+				tempDoc.field("method", requestEdge.method);
+				tempDoc.field("timestamp", requestEdge.timestamp);
+				tempDoc.field("uuid", requestEdge.uuid);
+				tempDoc.save();
 
 				//_watch.lap("Request event processed");
-				linkToUUID(oGraph, requestEdge.uuid, "Request", request.getIdentity());
+				//linkToUUID(oGraph, requestEdge.uuid, "Request", request.getIdentity());
+				linkToUUID(oGraph, requestEdge.uuid, "Request", tempDoc.getIdentity());
 				//_watch.stop("Link event processed");
 
 			} else if(frestoData.dataUnit.isSetResponseEdge()) {
 
 				ResponseEdge responseEdge = frestoData.dataUnit.getResponseEdge();
-				if(!isOdd(responseEdge.uuid)) {
-					return;
-				}
 				ClientID clientId = responseEdge.clientId;
 				ResourceID resourceId = responseEdge.resourceId;
 
@@ -284,25 +331,24 @@ public class UUIDOddAggregator {
 
 				//StopWatch _watch = new LoggingStopWatch("Writing Response Event");
 
-				ODocument response = oGraph.createVertex("Response")
-					.field("clientIp", clientId.getClientIp())
-					.field("url", resourceId.getUrl())
-					.field("httpStatus", responseEdge.httpStatus)
-					.field("elapsedTime", responseEdge.elapsedTime)
-					.field("timestamp", responseEdge.timestamp)
-					.field("uuid", responseEdge.uuid)
-					.save();
+				//ODocument response = oGraph.createVertex("Response")
+				tempDoc.setClassName("Response");
+					tempDoc.field("clientIp", clientId.getClientIp());
+					tempDoc.field("url", resourceId.getUrl());
+					tempDoc.field("httpStatus", responseEdge.httpStatus);
+					tempDoc.field("elapsedTime", responseEdge.elapsedTime);
+					tempDoc.field("timestamp", responseEdge.timestamp);
+					tempDoc.field("uuid", responseEdge.uuid);
+					tempDoc.save();
 
 				//_watch.lap("Response event processed");
-				linkToUUID(oGraph, responseEdge.uuid, "Respone", response.getIdentity());
+				linkToUUID(oGraph, responseEdge.uuid, "Respone", tempDoc.getIdentity());
+				//linkToUUID(oGraph, responseEdge.uuid, "Respone", response.getIdentity());
 				//_watch.stop("Link event processed");
 
 			} else if(frestoData.dataUnit.isSetEntryOperationCallEdge()) {
 
 				EntryOperationCallEdge entryOperationCallEdge = frestoData.dataUnit.getEntryOperationCallEdge();
-				if(!isOdd(entryOperationCallEdge.uuid)) {
-					return;
-				}
 				ResourceID resourceId = entryOperationCallEdge.resourceId;
 				OperationID operationId = entryOperationCallEdge.operationId;
 
@@ -310,31 +356,30 @@ public class UUIDOddAggregator {
 
 				//StopWatch _watch = new LoggingStopWatch("Writing EntryOperationCall");
 
-				ODocument entryCall = oGraph.createVertex("EntryOperationCall")
-					.field("hostName", entryOperationCallEdge.localHost)
-					.field("contextPath", entryOperationCallEdge.contextPath)
-					.field("port", entryOperationCallEdge.localPort)
-					.field("servletPath", entryOperationCallEdge.servletPath)
-					.field("operationName", operationId.getOperationName())
-					.field("typeName", operationId.getTypeName())
-					.field("httpMethod", entryOperationCallEdge.httpMethod)
-					.field("uuid", entryOperationCallEdge.uuid)
-					.field("timestamp", entryOperationCallEdge.timestamp)
-					.field("sequence", entryOperationCallEdge.sequence)
-					.field("depth", entryOperationCallEdge.depth)
-					.save();
+				//ODocument entryCall = oGraph.createVertex("EntryOperationCall")
+				tempDoc.setClassName("EntryOperationCall");
+					tempDoc.field("hostName", entryOperationCallEdge.localHost);
+					tempDoc.field("contextPath", entryOperationCallEdge.contextPath);
+					tempDoc.field("port", entryOperationCallEdge.localPort);
+					tempDoc.field("servletPath", entryOperationCallEdge.servletPath);
+					tempDoc.field("operationName", operationId.getOperationName());
+					tempDoc.field("typeName", operationId.getTypeName());
+					tempDoc.field("httpMethod", entryOperationCallEdge.httpMethod);
+					tempDoc.field("uuid", entryOperationCallEdge.uuid);
+					tempDoc.field("timestamp", entryOperationCallEdge.timestamp);
+					tempDoc.field("sequence", entryOperationCallEdge.sequence);
+					tempDoc.field("depth", entryOperationCallEdge.depth);
+					tempDoc.save();
 
 
 				//_watch.lap("EntryOperationCall event processed");
-				linkToUUID(oGraph, entryOperationCallEdge.uuid, "EntryOperationCall", entryCall.getIdentity());
+				linkToUUID(oGraph, entryOperationCallEdge.uuid, "EntryOperationCall", tempDoc.getIdentity());
+				//linkToUUID(oGraph, entryOperationCallEdge.uuid, "EntryOperationCall", entryCall.getIdentity());
 				//_watch.stop("Link event processed");
 
 			} else if(frestoData.dataUnit.isSetEntryOperationReturnEdge()) {
 
 				EntryOperationReturnEdge entryOperationReturnEdge = frestoData.dataUnit.getEntryOperationReturnEdge();
-				if(!isOdd(entryOperationReturnEdge.uuid)) {
-					return;
-				}
 				ResourceID resourceId = entryOperationReturnEdge.resourceId;
 				OperationID operationId = entryOperationReturnEdge.operationId;
 				//
@@ -342,29 +387,28 @@ public class UUIDOddAggregator {
 
 				//StopWatch _watch = new LoggingStopWatch("Writing EntryOperationReturn");
 
-				ODocument entryReturn = oGraph.createVertex("EntryOperationReturn")
-					.field("servletlPath", entryOperationReturnEdge.servletPath)
-					.field("operationName", operationId.getOperationName())
-					.field("typeName", operationId.getTypeName())
-					.field("httpStatus", entryOperationReturnEdge.httpStatus)
-					.field("timestamp", entryOperationReturnEdge.timestamp)
-					.field("elapsedTime", entryOperationReturnEdge.elapsedTime)
-					.field("uuid", entryOperationReturnEdge.uuid)
-					.field("sequence", entryOperationReturnEdge.sequence)
-					.field("depth", entryOperationReturnEdge.depth)
-					.save();
+				//ODocument entryReturn = oGraph.createVertex("EntryOperationReturn")
+				tempDoc.setClassName("EntryOperationReturn");
+					tempDoc.field("servletlPath", entryOperationReturnEdge.servletPath);
+					tempDoc.field("operationName", operationId.getOperationName());
+					tempDoc.field("typeName", operationId.getTypeName());
+					tempDoc.field("httpStatus", entryOperationReturnEdge.httpStatus);
+					tempDoc.field("timestamp", entryOperationReturnEdge.timestamp);
+					tempDoc.field("elapsedTime", entryOperationReturnEdge.elapsedTime);
+					tempDoc.field("uuid", entryOperationReturnEdge.uuid);
+					tempDoc.field("sequence", entryOperationReturnEdge.sequence);
+					tempDoc.field("depth", entryOperationReturnEdge.depth);
+					tempDoc.save();
 
 				//_watch.lap("EntryOperationReturn event processed");
-				linkToUUID(oGraph, entryOperationReturnEdge.uuid, "EntryOperationReturn", entryReturn.getIdentity());
+				linkToUUID(oGraph, entryOperationReturnEdge.uuid, "EntryOperationReturn", tempDoc.getIdentity());
+				//linkToUUID(oGraph, entryOperationReturnEdge.uuid, "EntryOperationReturn", entryReturn.getIdentity());
 				//_watch.stop("Link event processed");
 
 
 			} else if(frestoData.dataUnit.isSetOperationCallEdge()) {
 
 				OperationCallEdge operationCallEdge = frestoData.dataUnit.getOperationCallEdge();
-				if(!isOdd(operationCallEdge.uuid)) {
-					return;
-				}
 				OperationID operationId = operationCallEdge.operationId;
 
 
@@ -378,24 +422,23 @@ public class UUIDOddAggregator {
 				//
 				//StopWatch _watch = new LoggingStopWatch("Writing OperationCall");
 
-				ODocument operationCall = oGraph.createVertex("OperationCall")
-					.field("operationName", operationId.getOperationName())
-					.field("typeName", operationId.getTypeName())
-					.field("timestamp", operationCallEdge.timestamp)
-					.field("uuid", operationCallEdge.uuid)
-					.field("depth", operationCallEdge.depth)
-					.field("sequence", operationCallEdge.sequence)
-					.save();
+				//ODocument operationCall = oGraph.createVertex("OperationCall")
+				tempDoc.setClassName("OperationCall");
+					tempDoc.field("operationName", operationId.getOperationName());
+					tempDoc.field("typeName", operationId.getTypeName());
+					tempDoc.field("timestamp", operationCallEdge.timestamp);
+					tempDoc.field("uuid", operationCallEdge.uuid);
+					tempDoc.field("depth", operationCallEdge.depth);
+					tempDoc.field("sequence", operationCallEdge.sequence);
+					tempDoc.save();
 
 				//_watch.lap("OperationCall event processed");
-				linkToUUID(oGraph, operationCallEdge.uuid, "OperationCall", operationCall.getIdentity());
+				linkToUUID(oGraph, operationCallEdge.uuid, "OperationCall", tempDoc.getIdentity());
+				//linkToUUID(oGraph, operationCallEdge.uuid, "OperationCall", operationCall.getIdentity());
 				//_watch.stop("Link event processed");
 
 			} else if(frestoData.dataUnit.isSetOperationReturnEdge()) {
 				OperationReturnEdge operationReturnEdge = frestoData.dataUnit.getOperationReturnEdge();
-				if(!isOdd(operationReturnEdge.uuid)) {
-					return;
-				}
 				OperationID operationId = operationReturnEdge.operationId;
 
 				//StopWatch _watch = new LoggingStopWatch("Writing OperationReturn");
@@ -407,25 +450,24 @@ public class UUIDOddAggregator {
 				//	operationReturnMap.get(operationReturnEdge.uuid).put(operationReturnEdge.sequence, frestoData.dataUnit);
 				//}
 				//
-				ODocument operationReturn = oGraph.createVertex("OperationReturn")
-					.field("operationName", operationId.getOperationName())
-					.field("typeName", operationId.getTypeName())
-					.field("timestamp", operationReturnEdge.timestamp)
-					.field("elapsedTime", operationReturnEdge.elapsedTime)
-					.field("uuid", operationReturnEdge.uuid)
-					.field("sequence", operationReturnEdge.sequence)
-					.field("depth", operationReturnEdge.depth)
-					.save();
+				//ODocument operationReturn = oGraph.createVertex("OperationReturn")
+				tempDoc.setClassName("OperationReturn");
+					tempDoc.field("operationName", operationId.getOperationName());
+					tempDoc.field("typeName", operationId.getTypeName());
+					tempDoc.field("timestamp", operationReturnEdge.timestamp);
+					tempDoc.field("elapsedTime", operationReturnEdge.elapsedTime);
+					tempDoc.field("uuid", operationReturnEdge.uuid);
+					tempDoc.field("sequence", operationReturnEdge.sequence);
+					tempDoc.field("depth", operationReturnEdge.depth);
+					tempDoc.save();
 
 				//_watch.lap("OperationReturn event processed");
-				linkToUUID(oGraph, operationReturnEdge.uuid, "OperationReturn", operationReturn.getIdentity());
+				linkToUUID(oGraph, operationReturnEdge.uuid, "OperationReturn", tempDoc.getIdentity());
+				//linkToUUID(oGraph, operationReturnEdge.uuid, "OperationReturn", operationReturn.getIdentity());
 				//_watch.stop("Link event processed");
 			} else if(frestoData.dataUnit.isSetSqlCallEdge()) {
 
 				SqlCallEdge sqlCallEdge = frestoData.dataUnit.getSqlCallEdge();
-				if(!isOdd(sqlCallEdge.uuid)) {
-					return;
-				}
 				SqlID sqlId = sqlCallEdge.sqlId;
 
 				//Map<Integer, DataUnit> sqlCallSeqMap = sqlCallMap.putIfAbsent(sqlCallEdge.uuid, new ConcurrentSkipListMap<Integer, DataUnit>());
@@ -445,24 +487,23 @@ public class UUIDOddAggregator {
 				////}
 				//StopWatch _watch = new LoggingStopWatch("Writing SqlCall");
 
-				ODocument sqlCall = oGraph.createVertex("SqlCall")
-					.field("databaseUrl", sqlId.getDatabaseUrl())
-					.field("sql", sqlId.getSql())
-					.field("timestamp", sqlCallEdge.timestamp)
-					.field("uuid", sqlCallEdge.uuid)
-					.field("depth", sqlCallEdge.depth)
-					.field("sequence", sqlCallEdge.sequence)
-					.save();
+				//ODocument sqlCall = oGraph.createVertex("SqlCall")
+				tempDoc.setClassName("SqlCall");
+					tempDoc.field("databaseUrl", sqlId.getDatabaseUrl());
+					tempDoc.field("sql", sqlId.getSql());
+					tempDoc.field("timestamp", sqlCallEdge.timestamp);
+					tempDoc.field("uuid", sqlCallEdge.uuid);
+					tempDoc.field("depth", sqlCallEdge.depth);
+					tempDoc.field("sequence", sqlCallEdge.sequence);
+					tempDoc.save();
 
 				//_watch.lap("SqlCall event processed");
-				linkToUUID(oGraph, sqlCallEdge.uuid, "SqlCall", sqlCall.getIdentity());
+				linkToUUID(oGraph, sqlCallEdge.uuid, "SqlCall", tempDoc.getIdentity());
+				//linkToUUID(oGraph, sqlCallEdge.uuid, "SqlCall", sqlCall.getIdentity());
 				//_watch.stop("Link event processed");
 
 			} else if(frestoData.dataUnit.isSetSqlReturnEdge()) {
 				SqlReturnEdge sqlReturnEdge = frestoData.dataUnit.getSqlReturnEdge();
-				if(!isOdd(sqlReturnEdge.uuid)) {
-					return;
-				}
 				SqlID sqlId = sqlReturnEdge.sqlId;
 
 				//Map<Integer, DataUnit> sqlReturnSeqMap = sqlReturnMap.putIfAbsent(sqlReturnEdge.uuid, new ConcurrentSkipListMap<Integer, DataUnit>());
@@ -482,18 +523,20 @@ public class UUIDOddAggregator {
 				////}
 				//StopWatch _watch = new LoggingStopWatch("Writing SqlReturn");
 
-				ODocument sqlReturn = oGraph.createVertex("SqlReturn")
-					.field("databaseUrl", sqlId.getDatabaseUrl())
-					.field("sql", sqlId.getSql())
-					.field("timestamp", sqlReturnEdge.timestamp)
-					.field("elapsedTime", sqlReturnEdge.elapsedTime)
-					.field("uuid", sqlReturnEdge.uuid)
-					.field("depth", sqlReturnEdge.depth)
-					.field("sequence", sqlReturnEdge.sequence)
-					.save();
+				//ODocument sqlReturn = oGraph.createVertex("SqlReturn")
+				tempDoc.setClassName("SqlReturn");
+					tempDoc.field("databaseUrl", sqlId.getDatabaseUrl());
+					tempDoc.field("sql", sqlId.getSql());
+					tempDoc.field("timestamp", sqlReturnEdge.timestamp);
+					tempDoc.field("elapsedTime", sqlReturnEdge.elapsedTime);
+					tempDoc.field("uuid", sqlReturnEdge.uuid);
+					tempDoc.field("depth", sqlReturnEdge.depth);
+					tempDoc.field("sequence", sqlReturnEdge.sequence);
+					tempDoc.save();
 
 				//_watch.lap("SqlReturn event processed");
-				linkToUUID(oGraph, sqlReturnEdge.uuid, "SqlReturn", sqlReturn.getIdentity());
+				linkToUUID(oGraph, sqlReturnEdge.uuid, "SqlReturn", tempDoc.getIdentity());
+				//linkToUUID(oGraph, sqlReturnEdge.uuid, "SqlReturn", sqlReturn.getIdentity());
 				//_watch.stop("Link event processed");
 			} else {
 				LOGGER.info("No data unit exist.");
@@ -511,7 +554,7 @@ public class UUIDOddAggregator {
 		if(idx != null) {
 			oRID = (ORID) idx.get(key);
 			if(oRID == null) {
-				ODocument uuidDoc = oGraph.createVertex("UUIDEvens").field("uuid", key).save();
+				ODocument uuidDoc = oGraph.createVertex("UUID1").field("uuid", key).save();
 				oRID = uuidDoc.getIdentity();
 			}
 		} else {
@@ -523,18 +566,37 @@ public class UUIDOddAggregator {
 
 	public static void linkToUUID(OGraphDatabase oGraph, String uuid, String className, ORID oRID) {
 
-		ORID uuidORID = lookForVertex(oGraph, "UUIDEvens.uuid", uuid);
+		ORID uuidORID = lookForVertex(oGraph, "UUID1.uuid", uuid);
 		oGraph.createEdge(uuidORID, oRID).field("className", className).save();
 	}
 
-	private static boolean isOdd(String uuid) {
-		int mod = Character.getNumericValue(uuid.charAt(0)) % 2;
-		if(mod == 0) {
+	public static boolean isOdd(FrestoData frestoData) {
+		int key = -3;
+		if(frestoData.dataUnit.isSetRequestEdge()) {
+			key = Character.getNumericValue(frestoData.dataUnit.getRequestEdge().uuid.charAt(0));
+		} else if(frestoData.dataUnit.isSetResponseEdge()) {
+			key = Character.getNumericValue(frestoData.dataUnit.getResponseEdge().uuid.charAt(0));
+		} else if(frestoData.dataUnit.isSetEntryOperationCallEdge()) {
+			key = Character.getNumericValue(frestoData.dataUnit.getEntryOperationCallEdge().uuid.charAt(0));
+		} else if(frestoData.dataUnit.isSetEntryOperationReturnEdge()) {
+			key = Character.getNumericValue(frestoData.dataUnit.getEntryOperationReturnEdge().uuid.charAt(0));
+		} else if(frestoData.dataUnit.isSetOperationCallEdge()) {
+			key = Character.getNumericValue(frestoData.dataUnit.getOperationCallEdge().uuid.charAt(0));
+		} else if(frestoData.dataUnit.isSetOperationReturnEdge()) {
+			key = Character.getNumericValue(frestoData.dataUnit.getOperationReturnEdge().uuid.charAt(0));
+		} else if(frestoData.dataUnit.isSetSqlCallEdge()) {
+			key = Character.getNumericValue(frestoData.dataUnit.getSqlCallEdge().uuid.charAt(0));
+		} else if(frestoData.dataUnit.isSetSqlReturnEdge()) {
+			key = Character.getNumericValue(frestoData.dataUnit.getSqlReturnEdge().uuid.charAt(0));
+		}
+
+		
+		if( key % 2 == 0)
 			return false;
-		} else if(mod == 1) {
+		else if( key % 2 == 1)
 			return true;
-		} else {
-			LOGGER.severe("Mod = " + mod);
+		else {
+			LOGGER.info("Not even or odd");
 			return false;
 		}
 	}

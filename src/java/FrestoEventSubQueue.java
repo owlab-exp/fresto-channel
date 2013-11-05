@@ -57,7 +57,7 @@ public class FrestoEventSubQueue extends Thread {
 		LOGGER.info("Event Queue Shutting down...");
 	}
 
-	public void setReceiveSocket(ZMQ.Socket receiveSocket) {
+	public void setSubSocket(ZMQ.Socket receiveSocket) {
 		this.receiveSocket = receiveSocket;
 	}
 	public void stopWork() {
