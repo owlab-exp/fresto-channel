@@ -90,7 +90,7 @@ public class UUIDAggregator {
 	private static TDeserializer deserializer = new TDeserializer(new TBinaryProtocol.Factory());
 	
 
-	private static boolean work = true;
+	private static volatile boolean work = true;
 	private static boolean sleepOn = false;
 	private static int SLEEP_TIME = 10;
 
@@ -254,7 +254,7 @@ public class UUIDAggregator {
 		//OGraphDatabase oGraph = new OGraphDatabase(DB_URL);
 		LOGGER.info("Setting up connection to DB"); 
 		oGraph = new OGraphDatabase("remote:"+ dbHost + "/" + dbName);
-		oGraph.setRetainRecords(false);
+		//oGraph.setRetainRecords(false);
 		oGraph.setProperty("minPool", 1);
 		oGraph.setProperty("maxPool", 3);
 
