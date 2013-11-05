@@ -19,11 +19,26 @@ public  class EventHub extends  Thread implements Runnable {
 	private static String THIS_CLASS_NAME = "EventHub";
 	private static Logger LOGGER = Logger.getLogger(THIS_CLASS_NAME);
 
-	private static int frontPort = 7000; // 7000
-	private static int backPort = 7001; // 7001
+	private static int FRONT_PORT = 7000; // 7000
+	private static int BACK_PORT = 7001; // 7001
 	private ZMQ.Context ctx;
 
 	public  static void main(String[] args) {
+		// Ne
+		if(args.length < 2) {
+			LOGGER.info("Possible arguments: <front port> <back port>");
+			LOGGER.info("Default front/back ports will be used.");
+		} else {
+			try {
+				FRONT_PORT = Integer.parseInt(args[0]);
+				BACK_PORT = Integer.parseInt(args[1]);
+			} catch(NumberFormatException nfe) {
+				System.err.println("Arguments must be integers.");
+				System.exit(1);
+			}
+		}
+			
+
 		final ZMQ.Context context = ZMQ.context(1);
 
 		final Thread zmqThread = new Thread() {
@@ -32,13 +47,13 @@ public  class EventHub extends  Thread implements Runnable {
 
 				//ZMQ.Socket frontEnd = context.socket(ZMQ.XSUB);
 				ZMQ.Socket frontEnd = context.socket(ZMQ.SUB);
-				frontEnd.bind("tcp://*:" + frontPort);
+				frontEnd.bind("tcp://*:" + FRONT_PORT);
 
 				//ZMQ.Socket backEnd = context.socket(ZMQ.XPUB);
 				ZMQ.Socket backEnd = context.socket(ZMQ.PUB);
-				backEnd.bind("tcp://*:" + backPort);
+				backEnd.bind("tcp://*:" + BACK_PORT);
 
-				LOGGER.info("Starting Forwarder with " + frontPort + "/" + backPort);
+				LOGGER.info("Starting Forwarder with " + FRONT_PORT + "/" + BACK_PORT);
 
 				frontEnd.subscribe("".getBytes());
 				

@@ -54,7 +54,7 @@ public class FrestoEventQueue extends Thread {
 			}
 			//LOGGER.fine("EventQueue size = " + queue.size());
 		}
-		LOGGER.info("Shutting down...");
+		LOGGER.info("Event Queue Shutting down...");
 	}
 
 	public void setPullerSocket(ZMQ.Socket receiveSocket) {
@@ -78,6 +78,10 @@ public class FrestoEventQueue extends Thread {
 	
 	public void remove(FrestoEvent event) {
 		this.queue.remove(event);
+	}
+
+	public boolean isEmpty() {
+		return this.queue.isEmpty();
 	}
 }
 

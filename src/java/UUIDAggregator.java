@@ -11,9 +11,13 @@
  **************************************************************************************/
 import java.util.Iterator;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.Set;
 import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.logging.Logger;
 import java.io.IOException;
 
@@ -43,32 +47,25 @@ import fresto.data.SqlCallEdge;
 import fresto.data.SqlReturnEdge;
 import fresto.command.CommandEvent;
 
-//import com.tinkerpop.blueprints.impls.orient.OrientGraphNoTx;
-//import com.tinkerpop.blueprints.impls.orient.OrientGraph;
-//import com.tinkerpop.blueprints.Graph;
-//import com.tinkerpop.blueprints.Vertex;
-//import com.tinkerpop.blueprints.Edge;
 import com.orientechnologies.orient.core.db.graph.OGraphDatabase;
-//import com.orientechnologies.orient.core.db.graph.OGraphDatabasePool;
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
+import com.orientechnologies.orient.core.id.ORID;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.sql.query.OSQLSynchQuery;
 import com.orientechnologies.orient.core.sql.OCommandSQL;
 import com.orientechnologies.orient.core.index.OIndex;
 import com.orientechnologies.orient.core.intent.OIntentMassiveInsert;
 
-import org.perf4j.javalog.JavaLogStopWatch;
-import org.perf4j.StopWatch;
+//import org.perf4j.LoggingStopWatch;
+//import org.perf4j.javalog.JavaLogStopWatch;
+//import org.perf4j.StopWatch;
 
-public class OrientEventWriter {
-	private static String THIS_CLASS_NAME = "OrientEventWriter";
+/**
+ * Aggregate individual events by UUID and sequence
+ */
+public class UUIDAggregator {
+	private static String THIS_CLASS_NAME = "UUIDAggregator";
 	private static Logger LOGGER = Logger.getLogger(THIS_CLASS_NAME);
-
-	//private static final String ZMQ_URL = "tcp://fresto1.owlab.com:7002";
-
-	//private static final String DB_URL = "remote:fresto3.owlab.com/frestodb";
-	//private static final String DB_USER = "admin";
-	//private static final String DB_PASSWORD = "admin";
 
 	private static String frontHost;
 	private static int frontPort;
@@ -89,36 +86,23 @@ public class OrientEventWriter {
 	private static final String TOPIC_SQL_CALL = "SB";
 	private static final String TOPIC_SQL_RETURN = "SF";
 
-	// Command Events
-	private static final String TOPIC_COMMAND_EVENT = "CMD";
 	
-	//private FrestoData frestoData = new FrestoData();
 	private static TDeserializer deserializer = new TDeserializer(new TBinaryProtocol.Factory());
 	
 
-	private static boolean work = true;
+	private static volatile boolean work = true;
 	private static boolean sleepOn = false;
 	private static int SLEEP_TIME = 10;
 
 	private static OGraphDatabase oGraph;
 
-	public OrientEventWriter() {
-		//this.oGraph = setupDBConnection();
+	public UUIDAggregator() {
 
 	}
 
-	//public OrientEventWriter(String frontHost, int frontPort, String dbHost, String dbName, String dbUser, String password) {
-	//	this.frontHost = frontHost;
-	//	this.frontPort = frontPort;
-	//	this.dbHost = dbHost;
-	//	this.dbName = dbName;
-	//	this.dbUser = dbUser;
-	//	this.password = password;
-	//}
-
 	public static void main(String[] args) throws Exception {
 		if(args.length <  6) {
-			LOGGER.severe("Argumests needed : <frontHost> <frontPort> <dbHost> <dbName> <dbUser> <password>");
+			LOGGER.severe("Argumests needed : <frontHost> <frontPort> <nbHost> <nbName> <dbUser> <password>");
 			System.exit(1);
 		} else {
 			try { 
@@ -137,9 +121,9 @@ public class OrientEventWriter {
 		final ZMQ.Context context = ZMQ.context(1);
 
 		final FrestoEventQueue frestoEventQueue = new FrestoEventQueue();
-		
+
 		final Thread queueMonitorThread = new Thread() {
-			Logger _LOGGER = Logger.getLogger("writerThread");
+			Logger _LOGGER = Logger.getLogger("aggregatorThread");
 			@Override
 			public void run() {
 				while(work) {
@@ -148,30 +132,26 @@ public class OrientEventWriter {
 						Thread.sleep(1000);
 					} catch(InterruptedException ie) {
 					}
-
 				}
 			}
 		};
 
-
-		final Thread writerThread = new Thread() {
-			Logger _LOGGER = Logger.getLogger("writerThread");
-			@Override
-			public void run() {
+		final Thread aggregatorThread = new Thread() {
+				Logger _LOGGER = Logger.getLogger("aggregatorThread");
 				//StopWatch _watch = new JavaLogStopWatch(_LOGGER);
 				FrestoStopWatch _watch = new FrestoStopWatch();
-
-				OrientEventWriter eventWriter = new OrientEventWriter();
+			@Override
+			public void run() {
+				UUIDAggregator aggregator = new UUIDAggregator();
 
 
 				// Open database
-				//_LOGGER.info("Setup DB Connection");
-				eventWriter.setupDBConnection();
+				aggregator.setupDBConnection();
 				ODocument tempDoc = null;
 				if(oGraph.isClosed()) {
 					oGraph.open(dbUser, password);
 					tempDoc = oGraph.createVertex();
-					LOGGER.info("[Open DB] time[" + _watch.lap() + "]");
+					_LOGGER.info("[Open DB] " + _watch.lap() + " ms");
 				}
 
 
@@ -179,17 +159,16 @@ public class OrientEventWriter {
 				puller.connect("tcp://" + frontHost + ":" + frontPort);
 
 				//Consume socket data
-				//FrestoEventQueue frestoEventQueue = new FrestoEventQueue(puller);
 				frestoEventQueue.setPullerSocket(puller);
 				frestoEventQueue.start();
-				
+
 				//int writeCount = 0;
 
 				_watch.start();
-				
 				while(work) {
 
 					// To add sufficient events to the queue
+					//if(sleepOn) {
 					if(frestoEventQueue.isEmpty()) {
 						try {
 							_LOGGER.info("frestoEventQueue is empty. Waiting " + SLEEP_TIME + "ms...");
@@ -203,28 +182,20 @@ public class OrientEventWriter {
 					
 					//if(queueSize > 0) {
 
-						//eventWriter.setupDBConnection();
 						//_watch.start();
 						if(oGraph.isClosed()) {
 							oGraph.open(dbUser, password);
-							tempDoc = oGraph.createVertex();
-							LOGGER.warning("[Open DB] " + _watch.lap() + " ms.");
+							_LOGGER.info("[Open DB] " + _watch.lap() + " ms.");// queueSize=" + queueSize);
 						}
 
 						try { // for database close finally
 
 							//for(int i = 0; i < queueSize; i++) {
 								FrestoEvent frestoEvent = frestoEventQueue.poll(); 
-								//To shutting down gracefully by using ZMQ but not used.
-								//if(TOPIC_COMMAND_EVENT.equals(frestoEvent.topic)) {
-								//	eventWriter.handleCommand(frestoEvent.topic, frestoEvent.eventBytes);
-								//	continue;
-								//}
 								try {
-									eventWriter.writeEventData(tempDoc, frestoEvent.topic, frestoEvent.eventBytes);
+									aggregator.aggregateEventData(tempDoc, frestoEvent.topic, frestoEvent.eventBytes);
 									//writeCount++;
 								} catch(Exception te) {
-									//_LOGGER.warning("Exception occurred: " + te.getMessage());
 									te.printStackTrace();
 								}
 							//}
@@ -232,14 +203,13 @@ public class OrientEventWriter {
 							//oGraph.close();
 						}
 
-						// Count this
-						//oGraph.declareIntent(null);
-
 						//if(writeCount == 1000) {
-						//	LOGGER.info("time[" + _watch.lap() + "] " + writeCount + " events processed. Queue size = " + frestoEventQueue.size());
+						//	_LOGGER.info("time[" + _watch.lap() + "] " + writeCount + " event processed. Queue size = " + frestoEventQueue.size());
 						//	writeCount = 0;
 						//}
-						//LOGGER.info(queueSize + " events processed");
+						//_LOGGER.info("time[" + _watch.stop() + "] " + queueSize + " events processed");
+
+						//_LOGGER.info(queueSize + " events processed.");
 					//} else {
 					//	_LOGGER.fine("No events.");
 
@@ -247,7 +217,6 @@ public class OrientEventWriter {
 
 				}
 				_LOGGER.info("Shutting down...");
-
 
 				oGraph.close();
 
@@ -261,45 +230,31 @@ public class OrientEventWriter {
 		Runtime.getRuntime().addShutdownHook(new Thread() {
          		@Override
          		public void run() {
-         		   System.out.println("Interrupt received, killing server¡¦");
+         		   	System.out.println("Interrupt received, killing server¡¦");
 			   // To break while clause
-			   frestoEventQueue.stopWork();
-			   work = false;
+			   		frestoEventQueue.stopWork();
+			   		work = false;
 
-         		  try {
-				  writerThread.join();
-				  frestoEventQueue.join();
-				  queueMonitorThread.join();
+         		  	try {
+				  		frestoEventQueue.join();
+				  		aggregatorThread.join();
+				  		queueMonitorThread.join();
 
-         		  } catch (InterruptedException e) {
-         		  }
+         		  	} catch (InterruptedException e) {
+         		  	}
          		}
       		});
 
 		queueMonitorThread.start();
-		writerThread.start();
+		aggregatorThread.start();
 
-	}
-
-	public void handleCommand(String topic, byte[] eventBytes) throws TException {
-		LOGGER.info("A command received."); 
-		CommandEvent event = new CommandEvent(); 
-		deserializer.deserialize(event, eventBytes); 
-		if(event.target_module.equalsIgnoreCase(THIS_CLASS_NAME)) { 
-			if(event.command.equalsIgnoreCase("exit")) { 
-				LOGGER.info("Perform command: " + event.command); 
-				work = false; 
-			} else { 
-				LOGGER.warning("Unsupported command: " + event.command); 
-			} 
-		}
 	}
 
 	public OGraphDatabase setupDBConnection() {
 		//OGraphDatabase oGraph = new OGraphDatabase(DB_URL);
 		LOGGER.info("Setting up connection to DB"); 
 		oGraph = new OGraphDatabase("remote:"+ dbHost + "/" + dbName);
-		oGraph.setRetainRecords(false);
+		//oGraph.setRetainRecords(false);
 		oGraph.setProperty("minPool", 1);
 		oGraph.setProperty("maxPool", 3);
 
@@ -307,9 +262,7 @@ public class OrientEventWriter {
 		return oGraph;
 	}
 
-	public void writeEventData(ODocument tempDoc, String topic, byte[] eventBytes) throws TException, IOException {
-		tempDoc.reset();
-
+	public void aggregateEventData(ODocument tempDoc, String topic, byte[] eventBytes) throws TException, IOException {
 		if(TOPIC_REQUEST.equals(topic) 
 			|| TOPIC_RESPONSE.equals(topic)
 			|| TOPIC_ENTRY_CALL.equals(topic)
@@ -320,18 +273,21 @@ public class OrientEventWriter {
 			|| TOPIC_SQL_RETURN.equals(topic)
 			) {
 
+			//StopWatch _watch = new LoggingStopWatch("allocateEventData");
+
 			FrestoData frestoData = new FrestoData();
-			////_watch.lap("frestoData new");
 			//Reuse
 			//frestoData.clear();
 			deserializer.deserialize(frestoData, eventBytes);
-			////_watch.lap("deserialize eventBytes");
+			//_watch.lap("deserialize eventBytes");
 
 			Pedigree pedigree = new Pedigree();
                         pedigree.setReceivedTime(System.currentTimeMillis());
 
                         frestoData.setPedigree(pedigree);
-			////_watch.lap("setting pedigree");
+			//_watch.lap("setting pedigree");
+
+			tempDoc.reset();
 
 			if(frestoData.dataUnit.isSetRequestEdge()) {
 
@@ -339,21 +295,24 @@ public class OrientEventWriter {
 				ClientID clientId = requestEdge.clientId;
 				ResourceID resourceId = requestEdge.resourceId;
 
+				//requestMap.put(requestEdge.uuid, frestoData.dataUnit);
+				
+				//
 				//StopWatch _watch = new LoggingStopWatch("Writing Request Event");
 
 				//ODocument request = oGraph.createVertex("Request")
-					tempDoc.setClassName("Request");
-					tempDoc.field("clientIp", clientId.getClientIp());
-					tempDoc.field("url", resourceId.getUrl());
-					tempDoc.field("referrer", requestEdge.referrer);
-					tempDoc.field("method", requestEdge.method);
-					tempDoc.field("timestamp", requestEdge.timestamp);
-					tempDoc.field("uuid", requestEdge.uuid);
-					tempDoc.save();
+				tempDoc.setClassName("Request");
+				tempDoc.field("clientIp", clientId.getClientIp());
+				tempDoc.field("url", resourceId.getUrl());
+				tempDoc.field("referrer", requestEdge.referrer);
+				tempDoc.field("method", requestEdge.method);
+				tempDoc.field("timestamp", requestEdge.timestamp);
+				tempDoc.field("uuid", requestEdge.uuid);
+				tempDoc.save();
 
 				//_watch.lap("Request event processed");
-				linkToTS(oGraph, tempDoc.getIdentity(), "request", requestEdge.timestamp);
-				//linkToTS(oGraph, request.getIdentity(), "request", requestEdge.timestamp);
+				//linkToUUID(oGraph, requestEdge.uuid, "Request", request.getIdentity());
+				linkToUUID(oGraph, requestEdge.uuid, "Request", tempDoc.getIdentity());
 				//_watch.stop("Link event processed");
 
 			} else if(frestoData.dataUnit.isSetResponseEdge()) {
@@ -362,10 +321,13 @@ public class OrientEventWriter {
 				ClientID clientId = responseEdge.clientId;
 				ResourceID resourceId = responseEdge.resourceId;
 
+				//responseMap.put(responseEdge.uuid, frestoData.dataUnit);
+				//uuidMap.add(responseEdge.uuid);
+
 				//StopWatch _watch = new LoggingStopWatch("Writing Response Event");
 
 				//ODocument response = oGraph.createVertex("Response")
-					tempDoc.setClassName("Response");
+				tempDoc.setClassName("Response");
 					tempDoc.field("clientIp", clientId.getClientIp());
 					tempDoc.field("url", resourceId.getUrl());
 					tempDoc.field("httpStatus", responseEdge.httpStatus);
@@ -375,8 +337,8 @@ public class OrientEventWriter {
 					tempDoc.save();
 
 				//_watch.lap("Response event processed");
-				linkToTS(oGraph, tempDoc.getIdentity(), "response", responseEdge.timestamp);
-				//linkToTS(oGraph, response.getIdentity(), "response", responseEdge.timestamp);
+				linkToUUID(oGraph, responseEdge.uuid, "Respone", tempDoc.getIdentity());
+				//linkToUUID(oGraph, responseEdge.uuid, "Respone", response.getIdentity());
 				//_watch.stop("Link event processed");
 
 			} else if(frestoData.dataUnit.isSetEntryOperationCallEdge()) {
@@ -385,10 +347,12 @@ public class OrientEventWriter {
 				ResourceID resourceId = entryOperationCallEdge.resourceId;
 				OperationID operationId = entryOperationCallEdge.operationId;
 
+				//entryOperationCallMap.put(entryOperationCallEdge.uuid, frestoData.dataUnit);
+
 				//StopWatch _watch = new LoggingStopWatch("Writing EntryOperationCall");
 
 				//ODocument entryCall = oGraph.createVertex("EntryOperationCall")
-					tempDoc.setClassName("EntryOperationCall");
+				tempDoc.setClassName("EntryOperationCall");
 					tempDoc.field("hostName", entryOperationCallEdge.localHost);
 					tempDoc.field("contextPath", entryOperationCallEdge.contextPath);
 					tempDoc.field("port", entryOperationCallEdge.localPort);
@@ -404,23 +368,22 @@ public class OrientEventWriter {
 
 
 				//_watch.lap("EntryOperationCall event processed");
-				linkToTS(oGraph, tempDoc.getIdentity(), "entryCall", entryOperationCallEdge.timestamp);
-				//linkToTS(oGraph, entryCall.getIdentity(), "entryCall", entryOperationCallEdge.timestamp);
+				linkToUUID(oGraph, entryOperationCallEdge.uuid, "EntryOperationCall", tempDoc.getIdentity());
+				//linkToUUID(oGraph, entryOperationCallEdge.uuid, "EntryOperationCall", entryCall.getIdentity());
 				//_watch.stop("Link event processed");
-
-
-
 
 			} else if(frestoData.dataUnit.isSetEntryOperationReturnEdge()) {
 
 				EntryOperationReturnEdge entryOperationReturnEdge = frestoData.dataUnit.getEntryOperationReturnEdge();
 				ResourceID resourceId = entryOperationReturnEdge.resourceId;
 				OperationID operationId = entryOperationReturnEdge.operationId;
+				//
+				//entryOperationReturnMap.put(entryOperationReturnEdge.uuid, frestoData.dataUnit);
 
 				//StopWatch _watch = new LoggingStopWatch("Writing EntryOperationReturn");
 
 				//ODocument entryReturn = oGraph.createVertex("EntryOperationReturn")
-					tempDoc.setClassName("EntryOperationReturn");
+				tempDoc.setClassName("EntryOperationReturn");
 					tempDoc.field("servletlPath", entryOperationReturnEdge.servletPath);
 					tempDoc.field("operationName", operationId.getOperationName());
 					tempDoc.field("typeName", operationId.getTypeName());
@@ -433,8 +396,8 @@ public class OrientEventWriter {
 					tempDoc.save();
 
 				//_watch.lap("EntryOperationReturn event processed");
-				linkToTS(oGraph, tempDoc.getIdentity(), "entryReturn", entryOperationReturnEdge.timestamp);
-				//linkToTS(oGraph, entryReturn.getIdentity(), "entryReturn", entryOperationReturnEdge.timestamp);
+				linkToUUID(oGraph, entryOperationReturnEdge.uuid, "EntryOperationReturn", tempDoc.getIdentity());
+				//linkToUUID(oGraph, entryOperationReturnEdge.uuid, "EntryOperationReturn", entryReturn.getIdentity());
 				//_watch.stop("Link event processed");
 
 
@@ -443,10 +406,19 @@ public class OrientEventWriter {
 				OperationCallEdge operationCallEdge = frestoData.dataUnit.getOperationCallEdge();
 				OperationID operationId = operationCallEdge.operationId;
 
+
+				//Map<Integer, DataUnit> operationCallSeqMap = operationCallMap.putIfAbsent(operationCallEdge.uuid, new ConcurrentSkipListMap<Integer, DataUnit>());
+				//if(operationCallSeqMap != null) {
+				//	operationCallSeqMap.put(operationCallEdge.sequence, frestoData.dataUnit);
+				//} else {
+				//	operationCallSeqMap = operationCallMap.get(operationCallEdge.uuid);
+				//	operationCallSeqMap.put(operationCallEdge.sequence, frestoData.dataUnit);
+				//}
+				//
 				//StopWatch _watch = new LoggingStopWatch("Writing OperationCall");
 
 				//ODocument operationCall = oGraph.createVertex("OperationCall")
-					tempDoc.setClassName("OperationCall");
+				tempDoc.setClassName("OperationCall");
 					tempDoc.field("operationName", operationId.getOperationName());
 					tempDoc.field("typeName", operationId.getTypeName());
 					tempDoc.field("timestamp", operationCallEdge.timestamp);
@@ -456,8 +428,8 @@ public class OrientEventWriter {
 					tempDoc.save();
 
 				//_watch.lap("OperationCall event processed");
-				linkToTS(oGraph, tempDoc.getIdentity(), "operationCall", operationCallEdge.timestamp);
-				//linkToTS(oGraph, operationCall.getIdentity(), "operationCall", operationCallEdge.timestamp);
+				linkToUUID(oGraph, operationCallEdge.uuid, "OperationCall", tempDoc.getIdentity());
+				//linkToUUID(oGraph, operationCallEdge.uuid, "OperationCall", operationCall.getIdentity());
 				//_watch.stop("Link event processed");
 
 			} else if(frestoData.dataUnit.isSetOperationReturnEdge()) {
@@ -466,9 +438,15 @@ public class OrientEventWriter {
 
 				//StopWatch _watch = new LoggingStopWatch("Writing OperationReturn");
 
+				//Map<Integer, DataUnit> operationReturnSeqMap = operationReturnMap.putIfAbsent(operationReturnEdge.uuid, new ConcurrentSkipListMap<Integer, DataUnit>());
+				//if(operationReturnSeqMap != null) {
+				//	operationReturnSeqMap.put(operationReturnEdge.sequence, frestoData.dataUnit);
+				//} else {
+				//	operationReturnMap.get(operationReturnEdge.uuid).put(operationReturnEdge.sequence, frestoData.dataUnit);
+				//}
+				//
 				//ODocument operationReturn = oGraph.createVertex("OperationReturn")
-					tempDoc.setClassName("OperationReturn");
-					tempDoc.field("operationName", operationId.getOperationName());
+				tempDoc.setClassName("OperationReturn");
 					tempDoc.field("operationName", operationId.getOperationName());
 					tempDoc.field("typeName", operationId.getTypeName());
 					tempDoc.field("timestamp", operationReturnEdge.timestamp);
@@ -479,18 +457,33 @@ public class OrientEventWriter {
 					tempDoc.save();
 
 				//_watch.lap("OperationReturn event processed");
-				linkToTS(oGraph, tempDoc.getIdentity(), "operationReturn", operationReturnEdge.timestamp);
-				//linkToTS(oGraph, operationReturn.getIdentity(), "operationReturn", operationReturnEdge.timestamp);
+				linkToUUID(oGraph, operationReturnEdge.uuid, "OperationReturn", tempDoc.getIdentity());
+				//linkToUUID(oGraph, operationReturnEdge.uuid, "OperationReturn", operationReturn.getIdentity());
 				//_watch.stop("Link event processed");
 			} else if(frestoData.dataUnit.isSetSqlCallEdge()) {
 
 				SqlCallEdge sqlCallEdge = frestoData.dataUnit.getSqlCallEdge();
 				SqlID sqlId = sqlCallEdge.sqlId;
 
+				//Map<Integer, DataUnit> sqlCallSeqMap = sqlCallMap.putIfAbsent(sqlCallEdge.uuid, new ConcurrentSkipListMap<Integer, DataUnit>());
+				//if(sqlCallSeqMap != null) {
+				//	sqlCallSeqMap.put(sqlCallEdge.sequence, frestoData.dataUnit);
+				//} else {
+				//	sqlCallMap.get(sqlCallEdge.uuid).put(sqlCallEdge.sequence, frestoData.dataUnit);
+				//}
+				////Map<Integer, DataUnit> sqlCallSeqMap = sqlCallMap.get(sqlCallEdge.uuid);
+				////if(sqlCallSeqMap != null) {
+				////	//sqlCallSeqMap.put(sqlCallEdge.sequence, sqlCallEdge);
+				////	sqlCallSeqMap.put(sqlCallEdge.sequence, frestoData.dataUnit);
+				////} else {
+				////	sqlCallSeqMap = new ConcurrentHashMap<Integer, DataUnit>();
+				////	sqlCallSeqMap.put(sqlCallEdge.sequence, frestoData.dataUnit);
+				////	sqlCallMap.put(sqlCallEdge.uuid, sqlCallSeqMap);
+				////}
 				//StopWatch _watch = new LoggingStopWatch("Writing SqlCall");
 
 				//ODocument sqlCall = oGraph.createVertex("SqlCall")
-					tempDoc.setClassName("SqlCall");
+				tempDoc.setClassName("SqlCall");
 					tempDoc.field("databaseUrl", sqlId.getDatabaseUrl());
 					tempDoc.field("sql", sqlId.getSql());
 					tempDoc.field("timestamp", sqlCallEdge.timestamp);
@@ -500,18 +493,33 @@ public class OrientEventWriter {
 					tempDoc.save();
 
 				//_watch.lap("SqlCall event processed");
-				linkToTS(oGraph, tempDoc.getIdentity(), "sqlCall", sqlCallEdge.timestamp);
-				//linkToTS(oGraph, sqlCall.getIdentity(), "sqlCall", sqlCallEdge.timestamp);
+				linkToUUID(oGraph, sqlCallEdge.uuid, "SqlCall", tempDoc.getIdentity());
+				//linkToUUID(oGraph, sqlCallEdge.uuid, "SqlCall", sqlCall.getIdentity());
 				//_watch.stop("Link event processed");
 
 			} else if(frestoData.dataUnit.isSetSqlReturnEdge()) {
 				SqlReturnEdge sqlReturnEdge = frestoData.dataUnit.getSqlReturnEdge();
 				SqlID sqlId = sqlReturnEdge.sqlId;
 
+				//Map<Integer, DataUnit> sqlReturnSeqMap = sqlReturnMap.putIfAbsent(sqlReturnEdge.uuid, new ConcurrentSkipListMap<Integer, DataUnit>());
+				//if(sqlReturnSeqMap != null) {
+				//	sqlReturnSeqMap.put(sqlReturnEdge.sequence, frestoData.dataUnit);
+				//} else {
+				//	sqlReturnMap.get(sqlReturnEdge.uuid).put(sqlReturnEdge.sequence, frestoData.dataUnit);
+				//}
+				////Map<Integer, DataUnit> sqlReturnSeqMap = sqlReturnMap.get(sqlReturnEdge.uuid);
+				////if(sqlReturnSeqMap != null) {
+				////	//sqlReturnSeqMap.put(sqlReturnEdge.sequence, sqlReturnEdge);
+				////	sqlReturnSeqMap.put(sqlReturnEdge.sequence, frestoData.dataUnit);
+				////} else {
+				////	sqlReturnSeqMap = new ConcurrentHashMap<Integer, DataUnit>();
+				////	sqlReturnSeqMap.put(sqlReturnEdge.sequence, frestoData.dataUnit);
+				////	sqlReturnMap.put(sqlReturnEdge.uuid, sqlReturnSeqMap);
+				////}
 				//StopWatch _watch = new LoggingStopWatch("Writing SqlReturn");
 
 				//ODocument sqlReturn = oGraph.createVertex("SqlReturn")
-					tempDoc.setClassName("SqlReturn");
+				tempDoc.setClassName("SqlReturn");
 					tempDoc.field("databaseUrl", sqlId.getDatabaseUrl());
 					tempDoc.field("sql", sqlId.getSql());
 					tempDoc.field("timestamp", sqlReturnEdge.timestamp);
@@ -522,8 +530,8 @@ public class OrientEventWriter {
 					tempDoc.save();
 
 				//_watch.lap("SqlReturn event processed");
-				linkToTS(oGraph, tempDoc.getIdentity(), "sqlReturn", sqlReturnEdge.timestamp);
-				//linkToTS(oGraph, sqlReturn.getIdentity(), "sqlReturn", sqlReturnEdge.timestamp);
+				linkToUUID(oGraph, sqlReturnEdge.uuid, "SqlReturn", tempDoc.getIdentity());
+				//linkToUUID(oGraph, sqlReturnEdge.uuid, "SqlReturn", sqlReturn.getIdentity());
 				//_watch.stop("Link event processed");
 			} else {
 				LOGGER.info("No data unit exist.");
@@ -535,90 +543,26 @@ public class OrientEventWriter {
 		}
 	}
 
-        public static ODocument findOne(OGraphDatabase oGraph, OSQLSynchQuery oQuery, Map<String, Object> params) {
-		List<ODocument> result = oGraph.command(oQuery).execute(params);
-                for(ODocument doc: result) {
-                                LOGGER.fine("Found.");
-                                return doc;
-                }
-                return null;
-
-        }
-
-	public static ODocument lookForVertex(OGraphDatabase oGraph, String indexName, Object key) {
-		ODocument vertex = null;
+	public static ORID lookForVertex(OGraphDatabase oGraph, String indexName, Object key) {
+		ORID oRID = null;
 		OIndex<?> idx = oGraph.getMetadata().getIndexManager().getIndex(indexName);
 		if(idx != null) {
-			OIdentifiable rec = (OIdentifiable) idx.get(key);
-			if(rec != null) {
-				vertex = oGraph.getRecord(rec);
-			} else {
-				LOGGER.info("ORID: " + rec + " does not exist");
+			oRID = (ORID) idx.get(key);
+			if(oRID == null) {
+				ODocument uuidDoc = oGraph.createVertex("UUIDs").field("uuid", key).save();
+				oRID = uuidDoc.getIdentity();
 			}
 		} else {
 			LOGGER.info("INDEX: " + idx + " does not exist");
 		}
 
-		return vertex;
+		return oRID;
 	}
 
-	public static void linkToTS(OGraphDatabase oGraph, OIdentifiable oRID, String property, long timestamp) {
-		long second = (timestamp/1000) * 1000;
-		long minute = (timestamp/60000) * 60000;
-		//String second = "" + ((timestamp/1000) * 1000);
-		//String minute = "" + ((timestamp/60000) * 60000);
+	public static void linkToUUID(OGraphDatabase oGraph, String uuid, String className, ORID oRID) {
 
-		OSQLSynchQuery<ODocument> oQuery = new OSQLSynchQuery<ODocument>();
-		Map<String, Object> params = new HashMap<String, Object>();
-
-		oQuery.setText("select from TSRoot where minute = :minute");
-		params.put("minute", minute);
-		List<ODocument> rootDocs = oGraph.command(oQuery).execute(params);
-
-		if(rootDocs.size() > 0) {
-			ODocument rootDoc = rootDocs.get(0);
-			// TODO how not to get map  object? I just want to know if the second key exists
-			Map<String, ODocument> secondMap = rootDoc.field("second");
-			//LOGGER.info("secondMap size = " + secondMap.size());
-			ODocument secondDoc = secondMap.get(second);
-			if(secondDoc != null) {
-				// a map reated to the second exists
-				OCommandSQL cmd = new OCommandSQL();
-				cmd.setText("UPDATE " + secondDoc.getIdentity() + " ADD " + property + " = " + oRID);
-				int updated = oGraph.command(cmd).execute();
-			} else {
-				// a map reated to the second does not exist
-				OCommandSQL cmd = new OCommandSQL();
-				//cmd.setText("INSERT INTO TSSecond (request, response, entryCall, entryReturn) values ([],[],[],[])");
-				cmd.setText("INSERT INTO TSSecond (request, response, entryCall, entryReturn, operationCall, operationReturn, sqlCall, sqlReturn) values ([], [], [], [], [],[],[],[])");
-				secondDoc = oGraph.command(cmd).execute();
-
-				cmd.setText("UPDATE " + rootDoc.getIdentity() + " PUT second = \"" + second + "\", " + secondDoc.getIdentity());
-				int updated = oGraph.command(cmd).execute();
-				
-				linkToTS(oGraph, oRID, property, timestamp);
-
-			}
-
-		} else {
-			//LOGGER.info("Creating TSSecond vertex...");
-			OCommandSQL cmd = new OCommandSQL();
-			//cmd.setText("insert into TSSecond (request, response, entryCall, entryReturn) values ([],[],[],[])");
-			cmd.setText("INSERT INTO TSSecond (request, response, entryCall, entryReturn, operationCall, operationReturn, sqlCall, sqlReturn) values ([], [], [], [], [],[],[],[])");
-			ODocument newSecondDoc = oGraph.command(cmd).execute();
-
-			//LOGGER.info("Creating TSRoot vertex...");
-			ODocument newTSDoc = oGraph.createVertex("TSRoot")
-				.field("minute", minute)
-				.save();
-
-			cmd.setText("UPDATE " + newTSDoc.getIdentity() + " PUT second = \"" + second + "\", " + newSecondDoc.getIdentity());
-
-			oGraph.command(cmd).execute();
-
-			// call this method once again
-			linkToTS(oGraph, oRID, property, timestamp);
-		}
+		ORID uuidORID = lookForVertex(oGraph, "UUIDs.uuid", uuid);
+		oGraph.createEdge(uuidORID, oRID).field("className", className).save();
 	}
 }
 
