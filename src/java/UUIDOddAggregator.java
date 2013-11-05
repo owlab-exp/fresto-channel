@@ -283,6 +283,7 @@ public class UUIDOddAggregator {
 			//_watch.lap("deserialize eventBytes");
 			
 			if(!isOdd(frestoData)) {
+				LOGGER.info("Not odd uuid");
 				return;
 			}
 
