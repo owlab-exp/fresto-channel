@@ -239,14 +239,14 @@ public class UUIDOddAggregator {
          		  	try {
 				  		frestoEventQueue.join();
 				  		aggregatorThread.join();
-				  		queueMonitorThread.join();
+				  		//queueMonitorThread.join();
 
          		  	} catch (InterruptedException e) {
          		  	}
          		}
       		});
 
-		queueMonitorThread.start();
+		//queueMonitorThread.start();
 		aggregatorThread.start();
 
 	}
