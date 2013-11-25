@@ -68,7 +68,9 @@ public  class EventHub extends  Thread implements Runnable {
 
 
 				frontEnd.close();
-				backEnd.close();
+			 	backEnd.close();
+
+				LOGGER.info("Good bye.");
 			}
 		};
 

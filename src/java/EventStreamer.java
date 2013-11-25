@@ -60,6 +60,7 @@ public  class EventStreamer extends  Thread implements Runnable {
 
 				frontEnd.close();
 				backEnd.close();
+				LOGGER.info("Goodbye.");
 			}
 		};
 
