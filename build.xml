@@ -1,12 +1,12 @@
 <project name="Event Transmittion" default="dist" basedir=".">
 <!-- Define the properties used by the build -->
-<property name="jar.name"    value="event-trans"/>
+<property name="jar.name"    value="fresto-channel"/>
+<property name="jar.version"    value="0.85-alpah"/>
 <property name="build.home"    value="${basedir}/build"/>
 <property name="dist.home"     value="${basedir}/dist"/>
 <property name="docs.home"     value="${basedir}/docs"/>
 <property name="lib.home"     value="${basedir}/lib"/>
 <property name="src.home"      value="${basedir}/src"/>
-<property name="src-fresto-events.home"      value="${basedir}/fresto-events/gen-java"/>
 <property name="test.home"      value="${basedir}/test"/>
 
 <target name="help">
@@ -24,7 +24,10 @@
 <!-- Define the CLASSPATH -->
 <path id="compile.classpath">
 	<fileset dir="${lib.home}">
-		<include name="*.jar"/>
+		<include name="jeromq-0.3.0-SNAPSHOT.jar"/>
+		<include name="logback-classic-1.0.13.jar"/>
+		<include name="logback-core-1.0.13.jar"/>
+		<include name="slf4j-api-1.7.2.jar"/>
 	</fileset>
 </path>
 
@@ -49,7 +52,6 @@
 		<compilerarg value="-Xlint:unchecked"/>
 		-->
 		<classpath refid="compile.classpath"/>
-		<src path="${src-fresto-events.home}"/>
 		<src path="${src.home}/java"/>
 		<src path="${test.home}/java"/>
 	</javac>
@@ -61,7 +63,7 @@
 </target>
 
 <target name="dist" depends="compile" description="Create a jar file for binary distribution">
-	<jar jarfile="${dist.home}/${jar.name}.jar" basedir="${build.home}/classes"/>
+	<jar jarfile="${dist.home}/${jar.name}-${jar.version}.jar" basedir="${build.home}/classes"/>
 </target>
 
 </project> 
